@@ -1,0 +1,29 @@
+[
+  {
+    "id": "synthetic-hawkish-1",
+    "title": "Synthetic statement (hawkish)",
+    "paragraphs": [
+      "Inflation remains well above the Committee's 2 percent objective and price pressures have broadened.",
+      "The Committee anticipates that further increases in the target range will be appropriate."
+    ],
+    "expected_label": "strongly_hawkish"
+  },
+  {
+    "id": "synthetic-neutral-1",
+    "title": "Synthetic statement (balanced)",
+    "paragraphs": [
+      "Economic activity has expanded at a moderate pace and inflation has eased toward 2 percent.",
+      "The Committee judges that the risks to achieving its goals are roughly in balance."
+    ],
+    "expected_label": "neutral"
+  },
+  {
+    "id": "synthetic-dovish-1",
+    "title": "Synthetic statement (dovish)",
+    "paragraphs": [
+      "Labor market conditions have weakened and the unemployment rate has moved up.",
+      "The Committee decided to lower the target range and is prepared to adjust policy further to support employment."
+    ],
+    "expected_label": "dovish"
+  }
+]
