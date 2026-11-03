@@ -144,6 +144,9 @@ def test_market_research_commands_end_to_end(configured, monkeypatch, tmp_path, 
     assert cli.main(["summarize"]) == 0
     assert "summarized=3" in capsys.readouterr().out
 
+    assert cli.main(["publish"]) == 0
+    assert "published=3" in capsys.readouterr().out
+
 
 def test_analogues_for_unknown_document(configured, capsys) -> None:
     assert cli.main(["analogues", "00000000-0000-0000-0000-000000000000"]) == 2
@@ -153,3 +156,19 @@ def test_analogues_for_unknown_document(configured, capsys) -> None:
 def test_summarize_without_llm_configuration(configured, capsys) -> None:
     assert cli.main(["summarize"]) == 2
     assert "FEDTONE_LLM__API_KEY" in capsys.readouterr().err
+
+
+def test_schedule_requires_enabled_scheduler(configured, capsys) -> None:
+    assert cli.main(["schedule"]) == 2
+    assert "FEDTONE_SCHEDULER__ENABLED" in capsys.readouterr().err
+
+
+def test_schedule_once_runs_configured_stages_and_skips_the_rest(configured, capsys) -> None:
+    assert cli.main(["schedule", "--once"]) == 0
+    out = capsys.readouterr().out
+    assert "ingest: ingested=3" in out
+    assert "analyze: skipped" in out and "FEDTONE_LLM__API_KEY" in out
+    assert "reactions: skipped" in out
+
+    assert cli.main(["schedule", "--once"]) == 0
+    assert "ingest: ingested=0, unchanged=3" in capsys.readouterr().out

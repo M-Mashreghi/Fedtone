@@ -1,4 +1,4 @@
-"""Default stage runners for ``POST /api/v1/pipeline/{stage}`` (composition root).
+"""Default pipeline stage runners, shared by the API, the CLI and the scheduler.
 
 Each runner wires the same application service and adapters as the matching CLI command.
 The factories are parameters so tests can substitute fake LLM, market and source adapters.
@@ -20,6 +20,7 @@ from fedtone.application.pipeline import (
     StageRunner,
     StageUnavailableError,
 )
+from fedtone.application.publication import PublicationService
 from fedtone.application.research_summary import ResearchSummaryService
 from fedtone.application.sources import SourceRegistry, UnsupportedSourceError
 from fedtone.application.tone_analysis import AnalysisService, ToneAnalyzer
@@ -83,7 +84,7 @@ def default_stage_runners(
                 f"{exc} (set FEDTONE_LLM__API_KEY and FEDTONE_LLM__MODEL)"
             ) from exc
 
-    def ingest(bank: str, doc_type: str) -> PipelineResult:
+    def ingest(bank: str, doc_type: str, trigger: RunTrigger) -> PipelineResult:
         with _http_client(settings, settings.sources.timeout_seconds) as client:
             service = IngestionService(
                 registry=factories.registry(settings, client),
@@ -93,7 +94,7 @@ def default_stage_runners(
                 runs=SqlAlchemyProcessingRunRepository(session_factory),
             )
             try:
-                report = service.run(bank, doc_type, trigger=RunTrigger.MANUAL)
+                report = service.run(bank, doc_type, trigger=trigger)
             except UnsupportedSourceError as exc:
                 raise StageUnavailableError(str(exc)) from exc
         outcomes = {k.value: v for k, v in report.outcomes.items()}
@@ -108,7 +109,7 @@ def default_stage_runners(
             notes=notes,
         )
 
-    def analyze(bank: str, doc_type: str) -> PipelineResult:
+    def analyze(bank: str, doc_type: str, trigger: RunTrigger) -> PipelineResult:
         report = AnalysisService(
             analyzer=ToneAnalyzer(llm(), temperature=settings.llm.temperature),
             documents=documents,
@@ -121,7 +122,7 @@ def default_stage_runners(
         outcomes = {k.value: v for k, v in report.outcomes.items()}
         return PipelineResult(PipelineStage.ANALYZE, outcomes, aborted=report.aborted)
 
-    def reactions(bank: str, doc_type: str) -> PipelineResult:
+    def reactions(bank: str, doc_type: str, trigger: RunTrigger) -> PipelineResult:
         market = settings.market_data
         with _http_client(settings, market.timeout_seconds) as client:
             provider = factories.market_provider(settings, client)
@@ -149,7 +150,7 @@ def default_stage_runners(
             PipelineStage.REACTIONS, outcomes, aborted=report.aborted, notes=notes
         )
 
-    def summarize(bank: str, doc_type: str) -> PipelineResult:
+    def summarize(bank: str, doc_type: str, trigger: RunTrigger) -> PipelineResult:
         report = ResearchSummaryService(
             client=llm(),
             documents=documents,
@@ -164,9 +165,20 @@ def default_stage_runners(
         outcomes = {k.value: v for k, v in report.outcomes.items()}
         return PipelineResult(PipelineStage.SUMMARIZE, outcomes, aborted=report.aborted)
 
+    def publish(bank: str, doc_type: str, trigger: RunTrigger) -> PipelineResult:
+        report = PublicationService(
+            documents=documents,
+            analyses=analyses,
+            summaries=SqlAlchemyResearchSummaryRepository(session_factory),
+            reviews=reviews,
+        ).run(bank, doc_type)
+        outcomes = {k.value: v for k, v in report.outcomes.items()}
+        return PipelineResult(PipelineStage.PUBLISH, outcomes)
+
     return {
         PipelineStage.INGEST: ingest,
         PipelineStage.ANALYZE: analyze,
         PipelineStage.REACTIONS: reactions,
         PipelineStage.SUMMARIZE: summarize,
+        PipelineStage.PUBLISH: publish,
     }

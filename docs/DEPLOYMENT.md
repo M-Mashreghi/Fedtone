@@ -15,11 +15,14 @@ Related: [ARCHITECTURE.md](./ARCHITECTURE.md) · [RUNBOOK.md](./RUNBOOK.md) · [
 
 **Quality before publish:** CD image publishing must depend on the quality/test job. Failed tests block release.
 
-Recommended badges after workflows exist:
+CI jobs: **Lint and test** (ruff + pytest with fakes only), **Dependency audit**
+(`pip-audit`) and **Docker Compose smoke test** (build, `compose up --wait`, curl `/ready`,
+`/api/v1/system/telemetry` and the Streamlit health endpoint, run `fedtone backup` in the
+container, check the image holds no `.env` or data). CD calls the CI workflow first, then
+pushes `ghcr.io/<owner>/fedtone:<version>` and creates a GitHub Release.
 
 ```markdown
-[![CI](https://github.com/<USER>/fedtone/actions/workflows/ci.yml/badge.svg)](https://github.com/<USER>/fedtone/actions/workflows/ci.yml)
-[![CD](https://github.com/<USER>/fedtone/actions/workflows/cd.yml/badge.svg)](https://github.com/<USER>/fedtone/actions/workflows/cd.yml)
+[![CI](https://github.com/M-Mashreghi/Fedtone/actions/workflows/ci.yml/badge.svg)](https://github.com/M-Mashreghi/Fedtone/actions/workflows/ci.yml)
 ```
 
 ---
@@ -49,7 +52,10 @@ Configure under **Settings → Secrets and variables → Actions**. Never commit
 
 ### Branch Protection
 
-Require CI to pass before merge to `main`.
+CI runs on every pull request and push to `main`. To make a failing CI **block merges**, enable
+it once in GitHub: *Settings → Branches → Add rule* for `main` → *Require status checks to pass*
+→ select **Lint and test**, **Dependency audit** and **Docker Compose smoke test**. (This is a
+repository setting; it cannot be committed as a file.)
 
 ---
 
@@ -86,70 +92,61 @@ Host/port values for the API and Streamlit are passed to their servers at launch
 
 ## 4. Docker Packaging
 
-Recommended repository artifacts:
+Repository artifacts: `Dockerfile` (one image for every role, Python 3.12-slim, non-root
+user `fedtone`, uid 10001), `docker/entrypoint.sh`, `docker-compose.yml`, `.dockerignore`
+(excludes `.env*`, `data/`, databases, tests and docs from the build context) and
+`.env.example`. Secrets are read from the environment at run time only.
 
-```text
-Dockerfile
-Dockerfile.ui            # optional; may share one image initially
-docker-compose.yml
-.env.example
-.dockerignore
-```
+The entrypoint takes a role: `api` (runs `alembic upgrade head`, then uvicorn on 8000), `ui`
+(Streamlit on 8501), `scheduler` (migrates, then `fedtone schedule`), or any command
+(`fedtone backup`, `fedtone ingest`, ...).
 
-### Suggested Compose Services
+### Compose Services
 
-| Service | Role |
+| Service | Role | Health |
+|---|---|---|
+| `api` | Research API; applies migrations on start. | `GET /ready` |
+| `ui` | Streamlit dashboard, talks to `http://api:8000`; starts after the API is healthy. | `GET /_stcore/health` |
+| `scheduler` | Pipeline cycles every `FEDTONE_SCHEDULER__INGESTION_INTERVAL_MINUTES`. Opt-in profile: `docker compose --profile scheduler up -d`. Run only one. | — |
+
+### Durable Storage
+
+| Volume | Purpose |
 |---|---|
-| `api` | FastAPI application + ingestion/analysis commands. |
-| `ui` | Streamlit dashboard. |
-| `scheduler` | Optional separate scheduler process after MVP; may live in API initially. |
+| `fedtone-data` → `/app/data` | SQLite database (`fedtone.db`), `backups/`, optional `market/` CSV files. |
 
-For the simplest v1 deployment, API and scheduler may share one container/process model, while Streamlit is a second service.
-
-### Durable Mount
-
-| Mount | Purpose |
-|---|---|
-| `./data` → `/app/data` | SQLite database + local backups. |
-
-Raw source snapshots may be stored in SQLite or a documented data subdirectory. If files are used, their retention/backups must be explicit.
+Raw source snapshots live inside SQLite. A named volume avoids host permission problems with the
+non-root user; to use a host folder instead, mount `./data:/app/data` and
+`chown 10001 ./data` first.
 
 ---
 
 ## 5. Local Production-Shaped Start
 
 ```bash
-cp .env.example .env
-mkdir -p data
-
-docker compose build
-docker compose up -d
-
-docker compose ps
-curl -fsS http://localhost:8000/healthz
+cp .env.example .env              # optional; fill in LLM / market-data settings
+docker compose up -d --build --wait
+docker compose ps                 # api and ui report "healthy"
+curl -fsS http://localhost:8000/ready
+docker compose --profile scheduler up -d   # optional: scheduled pipeline cycles
 ```
 
-Open the Streamlit UI at the configured port, typically:
-
-```text
-http://localhost:8501
-```
+Dashboard: `http://localhost:8501`. API docs: `http://localhost:8000/docs`.
 
 ---
 
 ## 6. CI Quality Gates
 
-Suggested `ci.yml` steps:
+`ci.yml` steps:
 
-1. Checkout.
-2. Setup Python 3.12.
-3. Install locked dependencies.
-4. `ruff check .`
-5. `ruff format --check .`
-6. type check (`mypy`/`pyright` if adopted).
-7. `pytest -q --cov=src/fedtone`.
-8. dependency/security audit.
-9. optional Docker build smoke.
+1. Checkout and Python 3.12.
+2. `pip install -e ".[dev,dashboard]"` (no lock file yet; versions are lower-bounded in `pyproject.toml`).
+3. `ruff check .` (includes the flake8-bandit `S` security rules) and `ruff format --check .`.
+4. `pytest -q` — unit, integration, API, UI (Streamlit `AppTest`) and fake-provider E2E tests.
+5. `pip-audit` over the installed runtime dependencies.
+6. Docker Compose smoke test (see section 1).
+
+A static type checker is not adopted yet.
 
 ### Required Test Policy
 
@@ -214,11 +211,12 @@ docker compose up -d --build
 Before schema-changing releases:
 
 ```bash
-mkdir -p data/backups
-sqlite3 data/fedtone.db ".backup 'data/backups/fedtone-predeploy.db'"
+docker compose run --rm api fedtone backup       # or: fedtone backup (without Docker)
 ```
 
-In production automation, use the backup service/runbook rather than relying only on manual commands.
+The backup is taken with SQLite's online backup API, verified (integrity check, schema
+revision, record counts) and pruned to `FEDTONE_BACKUP__RETENTION_COUNT`. Restore and drill
+procedures: RUNBOOK sections 10 and 11.
 
 ---
 
@@ -256,3 +254,4 @@ In production automation, use the backup service/runbook rather than relying onl
 | Date | Change |
 |---|---|
 | 2026-10-13 | Initial FedTone deployment and CI/CD plan created. |
+| 2026-11-03 | Phase 6: Dockerfile, Compose (api/ui/scheduler), CI (lint, tests, audit, Docker smoke), CD to GHCR, backup command. |

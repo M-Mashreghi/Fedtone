@@ -4,10 +4,12 @@ import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from urllib.parse import urlsplit
 
 import httpx
 
 from fedtone.application.sources import PermanentSourceError, TransientSourceError
+from fedtone.observability import PROVIDER_METRICS
 
 logger = logging.getLogger(__name__)
 
@@ -42,21 +44,27 @@ class HttpFetcher:
         non-retryable HTTP errors (e.g. 404).
         """
         attempts = self._max_retries + 1
+        provider = f"http:{urlsplit(url).hostname or 'unknown'}"
         for attempt in range(1, attempts + 1):
+            started = time.perf_counter()
+            permanent = False
             try:
                 response = self._client.get(url)
             except httpx.TransportError as exc:
                 reason = f"{type(exc).__name__}"
             else:
                 if response.status_code < 400:
+                    PROVIDER_METRICS.record(provider, seconds=time.perf_counter() - started)
                     return HttpResponse(
                         url=str(response.url),
                         content=response.content,
                         content_type=response.headers.get("content-type", ""),
                     )
-                if response.status_code not in RETRYABLE_STATUS:
-                    raise PermanentSourceError(f"GET {url} returned HTTP {response.status_code}")
                 reason = f"HTTP {response.status_code}"
+                permanent = response.status_code not in RETRYABLE_STATUS
+            PROVIDER_METRICS.record(provider, seconds=time.perf_counter() - started, error=reason)
+            if permanent:
+                raise PermanentSourceError(f"GET {url} returned {reason}")
 
             if attempt == attempts:
                 raise TransientSourceError(f"GET {url} failed after {attempts} attempts: {reason}")

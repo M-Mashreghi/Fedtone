@@ -14,12 +14,19 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from uuid import UUID
 
+from fedtone.domain.models import RunTrigger
+
 
 class PipelineStage(StrEnum):
     INGEST = "ingest"
     ANALYZE = "analyze"
     REACTIONS = "reactions"
     SUMMARIZE = "summarize"
+    PUBLISH = "publish"
+
+
+# Order of one full pipeline cycle.
+CYCLE = tuple(PipelineStage)
 
 
 class StageUnavailableError(RuntimeError):
@@ -39,15 +46,22 @@ class PipelineResult:
         return self.aborted is None
 
 
-StageRunner = Callable[[str, str], PipelineResult]
+StageRunner = Callable[[str, str, RunTrigger], PipelineResult]
 
 
 class PipelineService:
     def __init__(self, runners: Mapping[PipelineStage, StageRunner]) -> None:
         self._runners = dict(runners)
 
-    def run(self, stage: PipelineStage, central_bank: str, document_type: str) -> PipelineResult:
+    def run(
+        self,
+        stage: PipelineStage,
+        central_bank: str,
+        document_type: str,
+        *,
+        trigger: RunTrigger = RunTrigger.MANUAL,
+    ) -> PipelineResult:
         runner = self._runners.get(stage)
         if runner is None:
             raise StageUnavailableError(f"stage {stage} is not configured")
-        return runner(central_bank, document_type)
+        return runner(central_bank, document_type, trigger)

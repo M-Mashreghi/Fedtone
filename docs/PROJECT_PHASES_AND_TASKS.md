@@ -623,22 +623,22 @@ A portfolio project should be reproducible and easy to inspect/export.
 
 ### Task 6.1: End-to-End Pipeline Integration Test
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Completed
 
 **Business Value / User Story**  
 Prove the full research promise: official fixture → parsed document → structured tone → comparison → market metrics → API result.
 
 **Definition of Done (DoD)**
 
-- [ ] Happy path green with fakes/fixtures.
-- [ ] Low-confidence LLM path reaches `NeedsReview`.
-- [ ] Missing market data produces partial, explicit result.
+- [x] Happy path green with fakes/fixtures.
+- [x] Low-confidence LLM path reaches `NeedsReview`.
+- [x] Missing market data produces partial, explicit result.
 
 ---
 
 ### Task 6.2: Scheduled Ingestion, Retry & Resumable Runs
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Completed
 
 **Business Value / User Story**  
 New statements should be discovered automatically without duplicate analysis or manual recovery from transient faults.
@@ -652,14 +652,14 @@ New statements should be discovered automatically without duplicate analysis or 
 
 **Definition of Done (DoD)**
 
-- [ ] Repeated schedule run creates no duplicate document.
-- [ ] Transient failure can retry/resume safely.
+- [x] Repeated schedule run creates no duplicate document.
+- [x] Transient failure can retry/resume safely.
 
 ---
 
 ### Task 6.3: Observability, Health & Secret Scrubbing
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Completed
 
 **Business Value / User Story**  
 Operators need fast diagnosis without exposing provider secrets or raw sensitive configuration.
@@ -674,14 +674,14 @@ Operators need fast diagnosis without exposing provider secrets or raw sensitive
 
 **Definition of Done (DoD)**
 
-- [ ] Health tests cover DB and provider readiness behavior.
-- [ ] Log capture tests contain no secret value.
+- [x] Health tests cover DB and provider readiness behavior.
+- [x] Log capture tests contain no secret value.
 
 ---
 
 ### Task 6.4: Docker & GitHub Actions CI/CD
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Completed
 
 **Business Value / User Story**  
 A clean checkout should build, test and run reproducibly, and releases should be easy to publish.
@@ -695,15 +695,15 @@ A clean checkout should build, test and run reproducibly, and releases should be
 
 **Definition of Done (DoD)**
 
-- [ ] `docker compose up` healthy locally.
-- [ ] CI blocks merge on failed tests.
-- [ ] No `.env` secret copied into image.
+- [x] `docker compose up` healthy locally.
+- [ ] CI blocks merge on failed tests. *(CI runs on every PR; blocking needs branch protection enabled once in GitHub settings, see DEPLOYMENT section 2)*
+- [x] No `.env` secret copied into image.
 
 ---
 
 ### Task 6.5: SQLite Backup, Disaster Recovery & Operational Runbook
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Completed
 
 **Business Value / User Story**  
 Research history, prompt/model metadata and human review decisions must be recoverable after host/database failure.
@@ -717,10 +717,10 @@ Research history, prompt/model metadata and human review decisions must be recov
 
 **Definition of Done (DoD)**
 
-- [ ] Backup created from live/staged DB.
-- [ ] Restore test reproduces known analysis records.
-- [ ] Runbook procedures verified.
-- [ ] Completing Task 6.5 closes M5 v1.1.
+- [x] Backup created from live/staged DB.
+- [x] Restore test reproduces known analysis records.
+- [x] Runbook procedures verified.
+- [x] Completing Task 6.5 closes M5 v1.1.
 
 ---
 

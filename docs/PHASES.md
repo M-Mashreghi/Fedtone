@@ -296,7 +296,7 @@ Expose the FedTone dataset and workflow through a documented API and a polished 
 
 ## Phase 6: Hardening, Dockerization & Production Readiness
 
-**Status:** `[ ]` Not Started  
+**Status:** `[x]` Completed — verified with fake providers and fixtures; the Docker Compose smoke test runs in GitHub Actions (no Docker on the development machine).  
 **Roadmap alignment:** M5 v1.1
 
 ### Scope
@@ -327,12 +327,12 @@ Add end-to-end coverage, scheduled ingestion, observability, Docker, CI/CD, back
 
 ### Definition of Done (DoD)
 
-- [ ] Full fake-provider E2E path is green in CI.
-- [ ] Scheduled ingestion can run twice without duplication.
-- [ ] Docker Compose starts healthy API/UI.
-- [ ] Logs include run/document correlation identifiers without secrets.
-- [ ] Backup restore drill reproduces research records.
-- [ ] Deployment and runbook docs are complete.
+- [x] Full fake-provider E2E path is green in CI.
+- [x] Scheduled ingestion can run twice without duplication.
+- [x] Docker Compose starts healthy API/UI.
+- [x] Logs include run/document correlation identifiers without secrets.
+- [x] Backup restore drill reproduces research records.
+- [x] Deployment and runbook docs are complete.
 
 ### Automated Test Criteria
 

@@ -438,15 +438,23 @@ class TelemetryOut(BaseModel):
     open_reviews: int
     recent_runs: list[RunOut]
     versions: dict[str, str]
+    providers: dict[str, dict[str, Any]]
 
     @classmethod
-    def of(cls, telemetry: SystemTelemetry, version: str, versions: dict[str, str]):
+    def of(
+        cls,
+        telemetry: SystemTelemetry,
+        version: str,
+        versions: dict[str, str],
+        providers: dict[str, dict[str, Any]],
+    ):
         return cls(
             version=version,
             documents_by_status=telemetry.documents_by_status,
             open_reviews=telemetry.open_reviews,
             recent_runs=[RunOut.of(r) for r in telemetry.recent_runs],
             versions=versions,
+            providers=providers,
         )
 
 

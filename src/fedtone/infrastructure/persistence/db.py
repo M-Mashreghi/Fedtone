@@ -39,3 +39,12 @@ def database_is_ready(engine: Engine) -> bool:
     except SQLAlchemyError:
         return False
     return True
+
+
+def schema_revision(engine: Engine) -> str | None:
+    """The Alembic revision the database is migrated to, or None (unmigrated/unreachable)."""
+    try:
+        with engine.connect() as connection:
+            return connection.execute(text("SELECT version_num FROM alembic_version")).scalar()
+    except SQLAlchemyError:
+        return None

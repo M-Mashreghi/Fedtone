@@ -47,6 +47,7 @@ from fedtone.domain.metrics import METRIC_VERSION
 from fedtone.domain.summary import SUMMARY_SCHEMA_VERSION
 from fedtone.domain.text import NORMALIZER_VERSION
 from fedtone.domain.tone_schema import COMPARISON_SCHEMA_VERSION, TONE_SCHEMA_VERSION
+from fedtone.observability import PROVIDER_METRICS
 
 VERSIONS = {
     "statement_prompt": STATEMENT_PROMPT_VERSION,
@@ -289,5 +290,8 @@ def resolve_review(item_id: UUID, body: ResolveIn, services: ServicesDep) -> Rev
 
 @router.get("/system/telemetry", response_model=TelemetryOut, tags=["system"])
 def telemetry(services: ServicesDep) -> TelemetryOut:
-    """Document counts per status, open reviews, recent runs and active versions."""
-    return TelemetryOut.of(services.queries.telemetry(), __version__, VERSIONS)
+    """Document counts per status, open reviews, recent runs, active versions and
+    per-provider request/error/latency counters of this process."""
+    return TelemetryOut.of(
+        services.queries.telemetry(), __version__, VERSIONS, PROVIDER_METRICS.snapshot()
+    )

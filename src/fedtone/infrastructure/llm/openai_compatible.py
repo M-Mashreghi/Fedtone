@@ -12,7 +12,7 @@ from fedtone.application.llm import (
     LLMResponse,
     LLMTransientError,
 )
-from fedtone.observability import scrub_secrets
+from fedtone.observability import PROVIDER_METRICS, scrub_secrets
 
 logger = logging.getLogger(__name__)
 
@@ -61,17 +61,23 @@ class OpenAICompatibleClient:
         headers = {"Authorization": f"Bearer {self._api_key}"}
         attempts = self._max_retries + 1
         for attempt in range(1, attempts + 1):
+            started = time.perf_counter()
             try:
                 response = self._client.post(self._url, json=body, headers=headers)
             except httpx.TransportError as exc:
                 reason = type(exc).__name__
             else:
                 if response.status_code == 200:
+                    PROVIDER_METRICS.record("llm", seconds=time.perf_counter() - started)
                     return self._parse(response)
                 detail = self._safe_detail(response)
-                if response.status_code not in RETRYABLE_STATUS:
-                    raise LLMPermanentError(f"LLM HTTP {response.status_code}: {detail}")
                 reason = f"HTTP {response.status_code}"
+                if response.status_code not in RETRYABLE_STATUS:
+                    PROVIDER_METRICS.record(
+                        "llm", seconds=time.perf_counter() - started, error=reason
+                    )
+                    raise LLMPermanentError(f"LLM HTTP {response.status_code}: {detail}")
+            PROVIDER_METRICS.record("llm", seconds=time.perf_counter() - started, error=reason)
             if attempt == attempts:
                 raise LLMTransientError(f"LLM request failed after {attempts} attempts: {reason}")
             delay = self._backoff_seconds * 2 ** (attempt - 1)

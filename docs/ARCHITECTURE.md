@@ -324,7 +324,8 @@ A React/Next.js UI can replace Streamlit later without changing domain contracts
 - **Exports** — `fedtone.application.research_export`: CSV/JSON of signal records at full
   precision and a Markdown research note built from the same stored records.
 - **Pipeline runs** — `fedtone.application.pipeline.PipelineService` dispatches
-  `ingest | analyze | reactions | summarize` to runners built in `fedtone.api.pipeline` from
+  `ingest | analyze | reactions | summarize | publish` to runners built in
+  `fedtone.infrastructure.pipeline` from
   the same services and adapters as the CLI (`fedtone.infrastructure.factories`). A stage
   whose provider is not configured returns 409; an aborted run returns 502. Retrying is the
   normal behavior of each stage (provider failures resume at the last good stage); review
@@ -386,6 +387,29 @@ MVP should remain lightweight:
 - scheduled ingestion via APScheduler or equivalent,
 - idempotent pipeline service,
 - retry policy around network/LLM boundaries.
+
+### Implementation (Phase 6)
+
+- **Stages** — `ingest → analyze → reactions → summarize → publish`
+  (`fedtone.application.pipeline.CYCLE`). `PublicationService` publishes `MarketLinked`
+  documents that have a validated research summary; the lifecycle guard still requires the
+  source hash and an evidence-backed analysis of that exact version, and a document that fails
+  it goes to review.
+- **Scheduler** — `fedtone.application.scheduler.PipelineScheduler` runs one cycle per
+  interval (`fedtone schedule`, Compose profile `scheduler`) without a new dependency: a
+  `threading.Event` loop, no overlapping cycles, unconfigured stages skipped, one crashing
+  stage does not stop the next. Idempotency comes from the canonical document identity and
+  content hashes plus status-driven stages; provider outages resume at the last good stage.
+  Runners for the API, CLI and scheduler are built in `fedtone.infrastructure.pipeline`.
+- **Observability** — JSON logs carry `run_id` (cycle or ingestion run) and `document_id`;
+  secrets are scrubbed by the formatter. `fedtone.observability.PROVIDER_METRICS` counts
+  requests, errors and latency per provider (`http:<host>` for official sources and FRED,
+  `llm`), exposed in `/api/v1/system/telemetry`. `/ready` requires a reachable, migrated
+  database and reports provider configuration without contacting providers.
+- **Backup** — `fedtone.infrastructure.persistence.backup`: SQLite online backup, integrity
+  check, schema revision and record counts, retention, restore with a `pre-restore` copy.
+- **Packaging** — one Docker image (roles `api`, `ui`, `scheduler`, or any command), Compose
+  with health checks and a named data volume, GitHub Actions CI and a GHCR CD workflow.
 
 Conceptual workflow:
 

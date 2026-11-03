@@ -3,8 +3,8 @@
 from fastapi.testclient import TestClient
 
 from fedtone.api.app import create_app
-from fedtone.api.pipeline import AdapterFactories
 from fedtone.application.sources import SourceRegistry
+from fedtone.infrastructure.pipeline import AdapterFactories
 from fedtone.infrastructure.sources.manual import ManualDocument, ManualSourceAdapter
 from fedtone.settings import Settings
 from tests.fake_llm import FakeLLM

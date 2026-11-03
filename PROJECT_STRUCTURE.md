@@ -6,6 +6,11 @@ FedTone/
 ├── README.md
 ├── PROJECT_STRUCTURE.md
 ├── pyproject.toml
+├── Dockerfile               # one image: api | ui | scheduler | any command
+├── docker-compose.yml       # api + ui (+ scheduler profile), named data volume
+├── .dockerignore
+├── docker/entrypoint.sh
+├── .github/workflows/       # ci.yml (lint, tests, audit, Docker smoke), cd.yml (GHCR)
 ├── alembic.ini
 ├── .gitignore
 ├── .env.example
@@ -23,23 +28,24 @@ FedTone/
 │   └── fedtone/
 │       ├── settings.py     # Pydantic settings + secret redaction
 │       ├── observability.py # JSON logging, correlation ids, secret scrubbing
-│       ├── cli.py          # ingest, reviews, analyze, resolve, benchmark, reactions, analogues, summarize
+│       ├── cli.py          # ingest … summarize, publish, schedule, backup, restore
 │       ├── domain/         # lifecycle, models (+ guard), text, linking, tone_schema, evidence, diff, market, calendar, metrics, analogues, summary
 │       ├── application/    # ports, sources, ingestion, llm, prompts, tone_analysis, review, evaluation,
 │       │                   # market_data, market_reaction, analogue_search, research_summary,
-│       │                   # research_queries, research_export, pipeline
+│       │                   # research_queries, research_export, pipeline, publication, scheduler
 │       ├── infrastructure/
-│       │   ├── persistence/ # db.py, orm.py, repositories.py
+│       │   ├── persistence/ # db.py, orm.py, repositories.py, backup.py
 │       │   ├── sources/    # http.py (retry), fomc.py, manual.py
 │       │   ├── llm/        # openai_compatible.py
 │       │   ├── market/     # fred.py (FRED CSV + local CSV providers)
-│       │   └── factories.py # adapter construction shared by CLI and API
-│       ├── api/            # app.py (factory, /healthz, /ready), routes.py (/api/v1),
-│       │                   # schemas.py, pipeline.py (stage runners)
+│       │   ├── factories.py # adapter construction shared by CLI and API
+│       │   └── pipeline.py  # stage runners shared by API, CLI and scheduler
+│       ├── api/            # app.py (factory, /healthz, /ready), routes.py (/api/v1), schemas.py
 │       └── ui/             # dashboard.py (Streamlit), client.py (API client), views.py
 ├── tests/
 │   ├── api/                # research API contract tests
 │   ├── ui/                 # dashboard view helpers + Streamlit AppTest smoke tests
+│   ├── e2e/                # fixture source → published result through the API
 │   ├── unit/               # includes layer import-boundary test
 │   ├── integration/        # migrations + repositories on fresh SQLite
 │   ├── fake_llm.py         # scripted LLM used by tests (no network)

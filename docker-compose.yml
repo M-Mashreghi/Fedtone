@@ -1,0 +1,66 @@
+# FedTone local/production-shaped stack.
+#   docker compose up -d --build                      # API (:8000) + dashboard (:8501)
+#   docker compose --profile scheduler up -d          # also run scheduled pipeline cycles
+#   docker compose run --rm api fedtone backup        # verified SQLite snapshot
+# Settings come from .env (optional) and the environment; see .env.example.
+
+x-fedtone: &fedtone
+  build: .
+  image: fedtone:local
+  env_file:
+    - path: .env
+      required: false
+  volumes:
+    - fedtone-data:/app/data
+  restart: unless-stopped
+
+services:
+  api:
+    <<: *fedtone
+    command: ["api"]
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=5)"
+      interval: 10s
+      timeout: 6s
+      retries: 6
+      start_period: 20s
+
+  ui:
+    <<: *fedtone
+    command: ["ui"]
+    environment:
+      FEDTONE_UI__API_BASE_URL: http://api:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=5)"
+      interval: 10s
+      timeout: 6s
+      retries: 6
+      start_period: 20s
+
+  scheduler:
+    <<: *fedtone
+    command: ["scheduler"]
+    profiles: ["scheduler"]
+    environment:
+      FEDTONE_SCHEDULER__ENABLED: "true"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  fedtone-data:

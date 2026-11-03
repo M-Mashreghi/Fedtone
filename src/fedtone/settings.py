@@ -119,6 +119,11 @@ class MarketDataSettings(BaseModel):
         return value or None
 
 
+class BackupSettings(BaseModel):
+    directory: str = "./data/backups"
+    retention_count: int = Field(default=7, ge=1)
+
+
 class UISettings(BaseModel):
     # The dashboard reads everything through the research API.
     api_base_url: str = "http://127.0.0.1:8000"
@@ -142,6 +147,7 @@ class Settings(BaseSettings):
     scheduler: SchedulerSettings = SchedulerSettings()
     market_data: MarketDataSettings = MarketDataSettings()
     ui: UISettings = UISettings()
+    backup: BackupSettings = BackupSettings()
 
     @model_validator(mode="after")
     def _require_production_secrets(self) -> "Settings":

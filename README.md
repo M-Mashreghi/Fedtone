@@ -140,10 +140,27 @@ the market reaction and the audit trail. It also works on a phone-width screen.
 ![Dashboard timeline](docs/images/dashboard-timeline.jpg)
 ![Meeting detail](docs/images/dashboard-meeting-detail.jpg)
 
-### 8. Develop and test
+### 8. Run everything on a schedule, back it up, or use Docker
+
+```bash
+fedtone publish                      # publish summarized, market-linked meetings
+FEDTONE_SCHEDULER__ENABLED=true fedtone schedule   # ingest → … → publish every interval
+fedtone schedule --once              # one cycle now
+fedtone backup                       # verified SQLite snapshot (keeps the newest 7)
+fedtone restore data/backups/<file> --yes
+
+docker compose up -d --build --wait  # API on :8000, dashboard on :8501
+docker compose --profile scheduler up -d
+```
+
+`/ready` checks that the database is reachable and migrated; `/api/v1/system/telemetry` shows
+document counts, recent runs and per-provider request/error/latency counters.
+
+### 9. Develop and test
 
 ```bash
 pytest                                  # all tests use fixtures and a fake LLM; no network needed
+                                        # CI (GitHub Actions) also runs pip-audit and a Docker smoke test
 ruff check . && ruff format --check .
 python scripts/capture_fomc_fixtures.py # capture real FOMC pages for the live-fixture tests
 ```
@@ -181,7 +198,7 @@ docs/               architecture, roadmap, phases, task ledger, runbook
 | 3 | LLM hawkish/dovish tone engine | Implemented with a fake LLM; closes after a human-labeled benchmark on a real model |
 | 4 | Market reaction, historical analogues, research summaries | Done with fixture market data; live FRED fetch still to be checked |
 | 5 | Research API and dashboard | Done (verified with fixture data) |
-| 6 | Hardening, Docker, production readiness | Planned |
+| 6 | Hardening, Docker, production readiness | Done (Docker verified in CI) |
 | 7 | Multi-bank, speeches, agentic research | Planned |
 
 ## Documentation

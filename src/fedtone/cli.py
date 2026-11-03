@@ -10,6 +10,10 @@
     fedtone reactions [--as-of ISO]     # market reactions for compared documents
     fedtone analogues DOCUMENT_ID       # most similar earlier meetings and their reactions
     fedtone summarize                   # LLM research summary over computed facts
+    fedtone publish                     # publish summarized, market-linked documents
+    fedtone schedule [--once]           # recurring ingest → … → publish cycles
+    fedtone backup [--verify FILE]      # verified SQLite snapshot with retention
+    fedtone restore FILE --yes          # replace the database with a verified backup
 
 Run ``alembic upgrade head`` first to create or migrate the database.
 """
@@ -17,7 +21,9 @@ Run ``alembic upgrade head`` first to create or migrate the database.
 import argparse
 import json
 import logging
+import signal
 import sys
+import threading
 from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
@@ -30,9 +36,12 @@ from fedtone.application.evaluation import load_dataset, run_benchmark
 from fedtone.application.ingestion import IngestionService
 from fedtone.application.llm import LLMPermanentError
 from fedtone.application.market_reaction import MarketReactionService
+from fedtone.application.pipeline import PipelineService
 from fedtone.application.prompts import STATEMENT_PROMPT_VERSION
+from fedtone.application.publication import PublicationService
 from fedtone.application.research_summary import ResearchSummaryService, metric_display
 from fedtone.application.review import ReviewService
+from fedtone.application.scheduler import PipelineScheduler
 from fedtone.application.sources import UnsupportedSourceError
 from fedtone.application.tone_analysis import AnalysisService, ToneAnalyzer
 from fedtone.domain.metrics import WindowSpec
@@ -42,6 +51,12 @@ from fedtone.infrastructure.factories import (
     build_llm_client,
     build_market_provider,
     build_registry,
+)
+from fedtone.infrastructure.persistence.backup import (
+    BackupError,
+    backup_database,
+    restore_database,
+    verify_backup,
 )
 from fedtone.infrastructure.persistence.db import create_db_engine, create_session_factory
 from fedtone.infrastructure.persistence.repositories import (
@@ -55,6 +70,7 @@ from fedtone.infrastructure.persistence.repositories import (
     SqlAlchemySourceSnapshotRepository,
     SqlAlchemyToneAnalysisRepository,
 )
+from fedtone.infrastructure.pipeline import default_stage_runners
 from fedtone.observability import configure_logging
 from fedtone.settings import Settings, get_settings
 
@@ -277,6 +293,98 @@ def _summarize(args: argparse.Namespace, settings: Settings) -> int:
     return 0
 
 
+def _publish(args: argparse.Namespace, settings: Settings) -> int:
+    session_factory = create_session_factory(create_db_engine(settings.database.url))
+    report = PublicationService(
+        documents=SqlAlchemyPolicyDocumentRepository(session_factory),
+        analyses=SqlAlchemyToneAnalysisRepository(session_factory),
+        summaries=SqlAlchemyResearchSummaryRepository(session_factory),
+        reviews=SqlAlchemyReviewItemRepository(session_factory),
+    ).run(args.bank, args.type)
+    print(", ".join(f"{name}={value}" for name, value in report.outcomes.items()))
+    return 0
+
+
+def _schedule(args: argparse.Namespace, settings: Settings) -> int:
+    if not (settings.scheduler.enabled or args.once):
+        print(
+            "error: scheduler disabled (set FEDTONE_SCHEDULER__ENABLED=true) or use --once",
+            file=sys.stderr,
+        )
+        return 2
+    session_factory = create_session_factory(create_db_engine(settings.database.url))
+    scheduler = PipelineScheduler(
+        PipelineService(default_stage_runners(settings, session_factory)),
+        central_bank=args.bank,
+        document_type=args.type,
+    )
+    if args.once:
+        report = scheduler.run_cycle()
+        for result in report.results:
+            outcomes = ", ".join(f"{k}={v}" for k, v in result.outcomes.items())
+            print(
+                f"{result.stage}: {outcomes}"
+                + (f" (aborted: {result.aborted})" if result.aborted else "")
+            )
+        for stage, reason in report.skipped.items():
+            print(f"{stage}: skipped ({reason})")
+        for stage, error in report.errors.items():
+            print(f"{stage}: error ({error})", file=sys.stderr)
+        return 0 if report.healthy else 1
+
+    stop = threading.Event()
+    for signum in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(signum, lambda *_: stop.set())
+    interval = settings.scheduler.ingestion_interval_minutes * 60
+    logger.info(
+        "scheduler started: every %s minute(s)", settings.scheduler.ingestion_interval_minutes
+    )
+    scheduler.run_forever(interval, stop=stop)
+    logger.info("scheduler stopped")
+    return 0
+
+
+def _print_backup(info) -> None:
+    counts = ", ".join(f"{table}={count}" for table, count in info.record_counts.items())
+    print(f"{info.path} (schema {info.schema_revision}): {counts}")
+
+
+def _backup(args: argparse.Namespace, settings: Settings) -> int:
+    try:
+        if args.verify:
+            info = verify_backup(Path(args.verify))
+        else:
+            info = backup_database(
+                settings.database.url,
+                Path(args.dir or settings.backup.directory),
+                retention_count=args.keep or settings.backup.retention_count,
+            )
+    except BackupError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    _print_backup(info)
+    return 0
+
+
+def _restore(args: argparse.Namespace, settings: Settings) -> int:
+    if not args.yes:
+        print(
+            "error: restore replaces the database; stop the API and scheduler, then rerun "
+            "with --yes",
+            file=sys.stderr,
+        )
+        return 2
+    try:
+        info, safety = restore_database(Path(args.backup_file), settings.database.url)
+    except BackupError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    _print_backup(info)
+    if safety is not None:
+        print(f"previous database kept at {safety}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="fedtone")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -316,6 +424,8 @@ def build_parser() -> argparse.ArgumentParser:
         ("documents", _documents, "list stored documents"),
         ("reactions", _reactions, "market reactions for compared documents"),
         ("summarize", _summarize, "LLM research summaries for market-linked documents"),
+        ("publish", _publish, "publish summarized, market-linked documents"),
+        ("schedule", _schedule, "run pipeline cycles every scheduler interval"),
     ):
         sub = commands.add_parser(name, help=text)
         sub.add_argument("--bank", default="FED")
@@ -323,6 +433,19 @@ def build_parser() -> argparse.ArgumentParser:
         sub.set_defaults(handler=handler)
         if name == "reactions":
             sub.add_argument("--as-of", help="only use data available at this ISO time")
+        if name == "schedule":
+            sub.add_argument("--once", action="store_true", help="run one cycle and exit")
+
+    backup = commands.add_parser("backup", help="verified SQLite snapshot")
+    backup.add_argument("--dir", help="backup directory (default FEDTONE_BACKUP__DIRECTORY)")
+    backup.add_argument("--keep", type=int, help="backups to keep (default from settings)")
+    backup.add_argument("--verify", metavar="FILE", help="only verify an existing backup")
+    backup.set_defaults(handler=_backup)
+
+    restore = commands.add_parser("restore", help="restore the database from a backup")
+    restore.add_argument("backup_file")
+    restore.add_argument("--yes", action="store_true", help="confirm replacing the database")
+    restore.set_defaults(handler=_restore)
 
     analogues = commands.add_parser("analogues", help="similar earlier meetings")
     analogues.add_argument("document_id")

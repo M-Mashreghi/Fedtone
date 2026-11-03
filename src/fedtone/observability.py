@@ -5,14 +5,19 @@ Usage::
     configure_logging(settings)
     with correlation_context(run_id=run.id, document_id=document.id):
         logger.info("parsed document")   # JSON line carries run_id and document_id
+
+    PROVIDER_METRICS.record("llm", seconds=0.8, error=None)   # one provider request
+    PROVIDER_METRICS.snapshot()                              # counters for telemetry
 """
 
 import json
 import logging
 import re
+import threading
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -71,6 +76,59 @@ class JsonFormatter(logging.Formatter):
             payload["exception"] = self.formatException(record.exc_info)
         line = json.dumps(payload, default=str, ensure_ascii=False)
         return scrub_secrets(line, self._secrets)
+
+
+@dataclass
+class _ProviderStat:
+    requests: int = 0
+    errors: int = 0
+    total_seconds: float = 0.0
+    last_error: str | None = None
+    last_error_at: str | None = None
+
+
+class ProviderMetrics:
+    """In-process request/error/latency counters per external provider.
+
+    One ``record`` per request attempt, so retries show up as extra requests. Error text is
+    scrubbed of credential-looking values before it is stored.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._stats: dict[str, _ProviderStat] = {}
+
+    def record(self, provider: str, *, seconds: float, error: str | None = None) -> None:
+        with self._lock:
+            stat = self._stats.setdefault(provider, _ProviderStat())
+            stat.requests += 1
+            stat.total_seconds += max(seconds, 0.0)
+            if error is not None:
+                stat.errors += 1
+                stat.last_error = scrub_secrets(error)[:300]
+                stat.last_error_at = datetime.now(UTC).isoformat()
+
+    def snapshot(self) -> dict[str, dict[str, object]]:
+        with self._lock:
+            return {
+                name: {
+                    "requests": s.requests,
+                    "errors": s.errors,
+                    "avg_latency_ms": round(1000 * s.total_seconds / s.requests, 1)
+                    if s.requests
+                    else None,
+                    "last_error": s.last_error,
+                    "last_error_at": s.last_error_at,
+                }
+                for name, s in sorted(self._stats.items())
+            }
+
+    def reset(self) -> None:
+        with self._lock:
+            self._stats.clear()
+
+
+PROVIDER_METRICS = ProviderMetrics()
 
 
 def configure_logging(settings: Settings) -> None:

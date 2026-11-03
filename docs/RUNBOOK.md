@@ -24,8 +24,8 @@ Production incident and maintenance procedures for **FedTone**. Companion docs: 
 | Probe | URL | Meaning |
 |---|---|---|
 | Liveness | `GET /healthz` | Process is running. |
-| Readiness | `GET /ready` | Database is reachable (`SELECT 1`); returns 503 with `{"checks": {"database": "unavailable"}}` otherwise. Provider checks are added in Task 6.3. |
-| Detailed | `GET /health/detailed` | Per-component diagnostic state if implemented. |
+| Readiness | `GET /ready` | 200 when the database answers and is migrated (`checks.database`, `checks.schema`, `schema_revision`); 503 otherwise. Also reports `llm`, `market_data` and `scheduler` configuration state without contacting providers or showing secrets. |
+| Telemetry | `GET /api/v1/system/telemetry` | Document counts per status, open reviews, recent runs, versions and per-provider `requests` / `errors` / `avg_latency_ms` / `last_error` of this process. |
 
 ```bash
 curl -fsS http://localhost:8000/healthz
@@ -246,46 +246,69 @@ Missing values appear as metrics with a `missing_reason`; never edit them in by 
 
 ### Recovery Procedure
 
-1. Stop application writes:
+1. Stop application writes (API and scheduler):
 
 ```bash
-docker compose stop
+docker compose stop api scheduler ui
 ```
 
-2. Locate newest verified backup under `./data/backups` or off-site copy.
-3. Keep the damaged DB as forensic copy; do not overwrite it immediately.
-4. Restore backup as `fedtone.db`.
-5. Run integrity check:
+2. Locate the newest backup under `FEDTONE_BACKUP__DIRECTORY` (`/app/data/backups` in Docker)
+   or an off-site copy, and verify it (integrity check, schema revision, record counts):
 
 ```bash
-sqlite3 data/fedtone.db 'PRAGMA integrity_check;'
+fedtone backup --verify data/backups/fedtone-20261103T020000000000Z.db
+docker compose run --rm api fedtone backup --verify /app/data/backups/<file>   # in Docker
 ```
 
-6. Start services:
+3. Restore. The command verifies the backup again, keeps the damaged database as
+   `fedtone.pre-restore-<time>.db` (forensic copy), replaces it and checks that the restored
+   record counts match the backup:
+
+```bash
+fedtone restore data/backups/<file> --yes
+docker compose run --rm api fedtone restore /app/data/backups/<file> --yes   # in Docker
+```
+
+4. Start services:
 
 ```bash
 docker compose up -d
 ```
 
-7. Verify `/ready`.
-8. Spot-check:
+5. Verify `/ready` (`checks.database` and `checks.schema` must be `ok`).
+6. Spot-check (`GET /api/v1/documents/{id}` and its `/audit`):
    - a known source document,
    - its source hash,
    - one tone analysis,
    - one comparison,
    - one market reaction record.
-9. Re-run ingestion since backup time; idempotency should prevent duplicate historical documents.
+7. Re-run the pipeline (`fedtone schedule --once` or `POST /api/v1/pipeline/ingest`); idempotent ingestion prevents duplicate historical documents.
+
+Verified by `tests/integration/test_backup.py` (backup of a live database, file deleted, restore, every API record identical) and by hand on a seeded database (2026-11-03).
 
 ---
 
 ## 11. Backup Verification (Routine)
 
-1. Confirm backup schedule ran.
-2. Confirm archive count respects retention policy.
-3. Restore a backup periodically into a temporary test DB.
-4. Run `PRAGMA integrity_check`.
-5. Query a known analysis and verify audit metadata.
-6. Record restore drill date in operations notes.
+Create backups with `fedtone backup` (SQLite online backup API, safe while the API and
+scheduler run). Schedule it on the host, e.g. a daily cron entry:
+
+```bash
+0 2 * * * cd /opt/fedtone && docker compose run --rm api fedtone backup
+```
+
+1. Confirm the newest `fedtone-<UTC time>.db` exists; only `FEDTONE_BACKUP__RETENTION_COUNT`
+   newest files are kept (default 7). Copy them off the host.
+2. `fedtone backup --verify FILE` prints the integrity result, schema revision and record
+   counts; compare the counts with `/api/v1/system/telemetry`.
+3. Periodically restore into a temporary database and query a known analysis:
+
+```bash
+FEDTONE_DATABASE__URL=sqlite:///./tmp/drill.db fedtone restore data/backups/<file> --yes
+FEDTONE_DATABASE__URL=sqlite:///./tmp/drill.db fedtone documents
+```
+
+4. Record the restore drill date in operations notes.
 
 ---
 
@@ -297,7 +320,13 @@ docker compose up -d
 
 1. Check scheduler process/health.
 2. Check last successful scheduled run timestamp.
-3. Confirm only one scheduler instance owns the schedule in single-node deployment.
+3. Confirm only one scheduler instance owns the schedule in single-node deployment
+   (`docker compose --profile scheduler ps`; cycles never overlap within one process).
+4. Run one cycle by hand and read the per-stage outcome: `fedtone schedule --once`. A stage
+   reported as `skipped` lacks configuration (LLM key/model, market-data provider); an
+   `aborted` stage hit a permanent provider error; `failed` documents resume next cycle.
+5. Logs: every line of a cycle carries the cycle's `run_id` (ingestion lines carry the
+   ingestion run id); filter with `docker compose logs scheduler | grep '"level": "ERROR"'`.
 4. Pause schedule if it is creating repeated failures.
 5. Run one manual ingestion cycle.
 6. Confirm idempotency before re-enabling recurring schedule.
@@ -316,8 +345,10 @@ docker compose up -d
 | `FEDTONE_LLM__TEMPERATURE` / `__TIMEOUT_SECONDS` / `__MAX_RETRIES` | LLM call parameters. |
 | `FEDTONE_LLM__BACKOFF_SECONDS` | Base delay for bounded exponential retry of LLM calls. |
 | `FEDTONE_LLM__MIN_CONFIDENCE` | Analyses below this confidence are stored but routed to review (default 0.6). |
-| `FEDTONE_SCHEDULER__ENABLED` | Enable scheduled discovery. |
-| `FEDTONE_SCHEDULER__INGESTION_INTERVAL_MINUTES` | Recurring discovery interval. |
+| `FEDTONE_SCHEDULER__ENABLED` | Allow `fedtone schedule` to loop (the Compose `scheduler` profile sets it). |
+| `FEDTONE_SCHEDULER__INGESTION_INTERVAL_MINUTES` | Minutes between pipeline cycles. |
+| `FEDTONE_BACKUP__DIRECTORY` | Where `fedtone backup` writes snapshots. |
+| `FEDTONE_BACKUP__RETENTION_COUNT` | Newest backups kept (default 7). |
 | `FEDTONE_SOURCES__USER_AGENT` / `__TIMEOUT_SECONDS` | HTTP identity and timeout for official sources. |
 | `FEDTONE_SOURCES__MAX_RETRIES` / `__BACKOFF_SECONDS` | Bounded retry with exponential backoff. |
 | `FEDTONE_SOURCES__FOMC_LISTING_URLS` | JSON list of pages scanned for statement links. |
@@ -332,7 +363,6 @@ docker compose up -d
 | `FEDTONE_UI__API_BASE_URL` | Research API address used by the dashboard (default `http://127.0.0.1:8000`). |
 | `FEDTONE_UI__TIMEOUT_SECONDS` | Dashboard request timeout. |
 | `FEDTONE_LOG_LEVEL` | Application log verbosity. |
-| `BACKUP_RETENTION_COUNT` | Number of local DB backups to retain (planned, Task 6.5). |
 
 ---
 
@@ -344,3 +374,4 @@ docker compose up -d
 | 2026-10-13 | Phase 3: `analyze`, `resolve`, `benchmark` commands and LLM config keys. |
 | 2026-10-13 | Phase 4: `reactions`, `documents`, `analogues`, `summarize` commands and market-data keys. |
 | 2026-11-03 | Phase 5: research API routes, pipeline/review endpoints, dashboard and `FEDTONE_UI__*` keys. |
+| 2026-11-03 | Phase 6: `publish`, `schedule`, `backup`, `restore`; detailed `/ready`; provider counters; Docker procedures. |

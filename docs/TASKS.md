@@ -174,20 +174,25 @@ Documentation and repository conventions. No production logic yet.
 
 ## Phase 6 — Hardening, Deployment & Operations
 
-- [ ] **Task 6.1** End-to-end pipeline test suite.
-- [ ] **Task 6.2** Scheduled ingestion, retries and resumable processing runs.
-- [ ] **Task 6.3** Observability, health/readiness and secret scrubbing.
-- [ ] **Task 6.4** Docker + GitHub Actions CI/CD.
-- [ ] **Task 6.5** SQLite backup/restore + operational runbook verification.
+- [x] **Task 6.1** End-to-end pipeline test suite.
+- [x] **Task 6.2** Scheduled ingestion, retries and resumable processing runs.
+- [x] **Task 6.3** Observability, health/readiness and secret scrubbing.
+- [-] **Task 6.4** Docker + GitHub Actions CI/CD. *(files and CI done; merge blocking needs branch protection in GitHub settings)*
+- [x] **Task 6.5** SQLite backup/restore + operational runbook verification.
 
 ### Verification — Phase 6
 
 | Item | Detail |
 |---|---|
-| **Status** | `[ ]` Not Started |
-| **Tests** | E2E, scheduler idempotency, backup/restore. |
-| **Deployment** | Docker Compose healthy; CI green. |
-| **Notes** | M5 v1.1 closes here. |
+| **Status** | `[x]` Completed except enabling branch protection (a GitHub setting). M5 v1.1 also waits on the open Phase 2/3/4 items. |
+| **Tests** | `pytest`: 529 passed, 2 skipped (Phase 2 live-fixture tests) on Python 3.14 with the `dev` and `dashboard` extras; CI runs the same suite on Python 3.12. `ruff check` / `ruff format --check` clean. No test calls the network or a real LLM. |
+| **Task 6.1** | `tests/e2e/test_pipeline_e2e.py`: FOMC fixture pages through the real FOMC adapter → ingest → analyze → reactions → summarize → publish via `POST /api/v1/pipeline/{stage}`; all three statements `Published`, published analysis id equals the analysis the API shows, audit hashes match, a second full cycle changes nothing. Low confidence → `NeedsReview` with a review item, successor not published. Fabricated evidence quote → `NeedsReview`, no analysis stored. A provider-reported missing yield → that metric `value=null` with `provider_reported_missing`, the other 8 metrics present, note says "not available". `tests/integration/test_publication.py`: waits for a summary; an analysis of another document version is routed to review. |
+| **Task 6.2** | `tests/integration/test_scheduler.py`: two scheduled cycles → 3 documents, 3 snapshots, 3 analyses, runs recorded with trigger `scheduled`; an LLM outage leaves documents `Failed` and the next cycle publishes all three; unconfigured stage skipped and a crashing stage does not stop the cycle; cycles never overlap; `run_forever` honors stop/max cycles. `tests/integration/test_cli.py`: `schedule` refuses when disabled, `schedule --once` ingests, reports skipped stages and is idempotent; `publish`. |
+| **Task 6.3** | `tests/api/test_health.py`: `/ready` 200 only for a reachable migrated database, 503 for unmigrated or unreachable (no path leaked), provider configuration reported without the key. `tests/unit/test_provider_metrics.py`: per-host and LLM request/error/latency counters, retries counted, error text scrubbed. `tests/integration/test_observability_pipeline.py`: a full cycle whose provider error echoes the API key logs JSON lines that all carry a `run_id`, some a `document_id`, and never the key. |
+| **Task 6.4** | `Dockerfile`, `docker/entrypoint.sh`, `docker-compose.yml`, `.dockerignore`, `.github/workflows/ci.yml` and `cd.yml`. `tests/unit/test_deployment_files.py`: `.env*`, databases and `data/` excluded from the build context; no `COPY .`; non-root user; LF entrypoint; Compose health checks and UI → API wiring; CI runs ruff, pytest, pip-audit and the Compose smoke test; CD publishes only after CI. Docker is not installed on the development machine, so `docker compose up --wait` is verified by the CI Docker job. |
+| **Task 6.5** | `tests/integration/test_backup.py`: online backup while the API engine is connected; database file deleted; restore → every `/timeline` and `/documents/{id}` response identical; restore keeps a `pre-restore` copy; retention keeps the newest N; corrupt or unmigrated backups rejected and the database untouched; non-file SQLite URLs rejected; `backup`, `backup --verify`, `restore` (requires `--yes`) commands. Runbook procedure run by hand on a seeded database: backup → verify → restore → `fedtone documents`. |
+| **Docs** | ARCHITECTURE (Phase 6 implementation), DEPLOYMENT (Docker, Compose, CI/CD, branch protection), RUNBOOK (readiness, telemetry, scheduler, backup/restore procedures, config keys), README, PROJECT_STRUCTURE, PHASES, PROJECT_PHASES_AND_TASKS, `.env.example`, this ledger. |
+| **Notes** | The scheduler is a small built-in loop instead of APScheduler (no new dependency; one process per database). Publication requires a validated research summary, so documents are published only after the summary stage. `/ready` no longer passes for an unmigrated database. |
 
 ---
 
@@ -218,7 +223,7 @@ Documentation and repository conventions. No production logic yet.
 - [x] Returns/yields/statistics come from deterministic tested code.
 - [x] Historical tests enforce point-in-time data boundaries.
 - [x] Missing data is explicit.
-- [ ] No secret/API key is committed or logged.
+- [x] No secret/API key is committed or logged.
 - [ ] No automated trade execution is introduced without a separate approved scope.
 
 ---

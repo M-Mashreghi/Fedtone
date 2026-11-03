@@ -2,12 +2,12 @@
 
 import logging
 from collections.abc import Mapping
+from pathlib import Path
 
 from fastapi import FastAPI, Response, status
 from sqlalchemy import Engine
 
 from fedtone import __version__
-from fedtone.api.pipeline import AdapterFactories, default_stage_runners
 from fedtone.api.routes import Services, router
 from fedtone.application.analogue_search import AnalogueService
 from fedtone.application.pipeline import PipelineService, PipelineStage, StageRunner
@@ -17,6 +17,7 @@ from fedtone.infrastructure.persistence.db import (
     create_db_engine,
     create_session_factory,
     database_is_ready,
+    schema_revision,
 )
 from fedtone.infrastructure.persistence.repositories import (
     SqlAlchemyComparisonRepository,
@@ -28,6 +29,7 @@ from fedtone.infrastructure.persistence.repositories import (
     SqlAlchemySourceSnapshotRepository,
     SqlAlchemyToneAnalysisRepository,
 )
+from fedtone.infrastructure.pipeline import AdapterFactories, default_stage_runners
 from fedtone.observability import configure_logging
 from fedtone.settings import Settings, get_settings
 
@@ -76,17 +78,46 @@ def create_app(
 
     @app.get("/ready", tags=["system"])
     def ready(response: Response) -> dict[str, object]:
-        """Readiness: dependencies needed to serve requests are reachable."""
-        database_ok = database_is_ready(get_engine())
-        if not database_ok:
-            logger.warning("readiness check failed: database unavailable")
+        """Readiness: the database is reachable and migrated. Optional providers are reported
+        (``configured`` / ``not_configured``) but do not fail readiness; pipeline stages that
+        need a missing provider answer 409 instead."""
+        engine = get_engine()
+        database_ok = database_is_ready(engine)
+        revision = schema_revision(engine) if database_ok else None
+        checks = {
+            "database": "ok" if database_ok else "unavailable",
+            "schema": "ok" if revision else "missing",
+            **provider_checks(settings),
+        }
+        ok = database_ok and revision is not None
+        if not ok:
+            logger.warning("readiness check failed: %s", checks)
             response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         return {
-            "status": "ready" if database_ok else "unavailable",
-            "checks": {"database": "ok" if database_ok else "unavailable"},
+            "status": "ready" if ok else "unavailable",
+            "checks": checks,
+            "schema_revision": revision,
         }
 
     return app
+
+
+def provider_checks(settings: Settings) -> dict[str, str]:
+    """Configuration state of optional providers; never contacts them and never shows secrets."""
+    llm = settings.llm
+    llm_ok = bool(llm.api_key and llm.api_key.get_secret_value() and llm.model)
+    market = settings.market_data
+    if market.provider == "none":
+        market_state = "not_configured"
+    elif market.provider == "csv" and not Path(market.csv_directory).is_dir():
+        market_state = "csv_directory_missing"
+    else:
+        market_state = "configured"
+    return {
+        "llm": "configured" if llm_ok else "not_configured",
+        "market_data": market_state,
+        "scheduler": "enabled" if settings.scheduler.enabled else "disabled",
+    }
 
 
 def _build_services(

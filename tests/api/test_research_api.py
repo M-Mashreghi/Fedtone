@@ -286,11 +286,11 @@ def test_reviews_can_be_listed_and_resolved_to_resume(
 def test_pipeline_stage_dispatches_to_runner(api_settings, migrated_engine) -> None:
     calls = []
 
-    def analyze(bank: str, doc_type: str) -> PipelineResult:
+    def analyze(bank: str, doc_type: str, trigger) -> PipelineResult:
         calls.append((bank, doc_type))
         return PipelineResult(PipelineStage.ANALYZE, {"analyzed": 2})
 
-    def failing(bank: str, doc_type: str) -> PipelineResult:
+    def failing(bank: str, doc_type: str, trigger) -> PipelineResult:
         return PipelineResult(PipelineStage.SUMMARIZE, {}, aborted="provider rejected the key")
 
     client = TestClient(
