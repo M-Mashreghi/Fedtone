@@ -63,6 +63,10 @@ class ProcessingRunRepository(Protocol):
 
     def update(self, run: ProcessingRun) -> None: ...
 
+    def list_recent(self, *, limit: int = 20) -> Sequence[ProcessingRun]:
+        """Most recently started runs first."""
+        ...
+
 
 class ReviewItemRepository(Protocol):
     def add(self, item: ReviewItem) -> None: ...

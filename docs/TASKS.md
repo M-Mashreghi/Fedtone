@@ -149,20 +149,26 @@ Documentation and repository conventions. No production logic yet.
 
 ## Phase 5 — Research API & Streamlit Dashboard
 
-- [ ] **Task 5.1** Core research REST API.
-- [ ] **Task 5.2** Policy Tone Timeline dashboard.
-- [ ] **Task 5.3** Meeting detail + evidence + statement diff view.
-- [ ] **Task 5.4** Market reaction + historical analogue view.
-- [ ] **Task 5.5** Audit metadata, filters and CSV/JSON/Markdown export.
+- [x] **Task 5.1** Core research REST API.
+- [x] **Task 5.2** Policy Tone Timeline dashboard.
+- [x] **Task 5.3** Meeting detail + evidence + statement diff view.
+- [x] **Task 5.4** Market reaction + historical analogue view.
+- [x] **Task 5.5** Audit metadata, filters and CSV/JSON/Markdown export.
 
 ### Verification — Phase 5
 
 | Item | Detail |
 |---|---|
-| **Status** | `[ ]` Not Started |
-| **Tests** | API contract tests + UI smoke where practical. |
-| **Docs** | API routes, screenshots and quickstart. |
-| **Notes** | M4 v1.0 closes here. |
+| **Status** | `[x]` Completed — verified with a fake LLM and fixture market data. M4 v1.0 also waits on the open Phase 2/3/4 items (captured official pages, real-model benchmark, live FRED check). |
+| **Tests** | `pytest`: 485 passed, 2 skipped (Phase 2 live-fixture tests) on Python 3.14 in a fresh virtual environment with the `dev` and `dashboard` extras. `ruff check` / `ruff format --check` clean. No test calls the network or a real LLM. |
+| **Task 5.1** | `tests/api/test_research_api.py`: document list in release order with stored score/confidence/delta/dimensions/versions/hash; pagination; date/bank/model/status filters; naive dates, bad status and bad limits rejected (422); detail with source, score, evidence, diff, reaction, summary and audit; analysis/comparison routes (baseline has no delta); unknown id → 404; analogues use only earlier meetings, withhold later metrics, reject a cutoff after the meeting; reviews listed and resolved with resume (404/409 paths); pipeline stages dispatch, aborted run → 502, unconfigured stage → 409; telemetry; OpenAPI lists the routes. `tests/integration/test_api_pipeline.py`: ingest → analyze → reactions through `POST /api/v1/pipeline/{stage}` with fake adapters; the run and its results appear in `/runs`, `/timeline` and `/documents/{id}`; re-running ingest leaves documents unchanged. Handlers only call `ResearchQueryService`, `AnalogueService`, `ReviewService` and `PipelineService`. |
+| **Task 5.2** | `tests/ui/test_views.py`: timeline trace y-values and ids equal `/api/v1/timeline` for the overall and a dimension series; meetings in review (red X) and without a score (grey marker, gap in the line) are separate traces. `tests/ui/test_dashboard_smoke.py` (Streamlit `AppTest`): dashboard renders, dimension selector reruns cleanly, unreachable API shows an error. |
+| **Task 5.3** | `AppTest`: selecting a meeting shows its stored score, confidence, previous score/delta (baseline for the first meeting), and a caption with source URL, content hash, model, prompt and schema next to the score. View helpers return evidence quotes, added/removed/changed sentences, dimension scores/deltas and audit fields exactly as the API returns them. |
+| **Task 5.4** | `test_market_reaction_values_equal_canonical_metrics`: every metric value equals the stored `EventMetric` exactly; yields are labeled bps, returns carry the canonical `%` display; windows ordered by definition. `test_backtest_metrics_are_flagged`: metrics computed with an earlier `as_of` are marked `backtest_mode` and the dashboard shows a point-in-time warning; the analogue tab always shows the point-in-time note and an insufficient-history warning. |
+| **Task 5.5** | `test_csv_and_json_exports_reproduce_api_values`: every CSV/JSON field equals the `/timeline` value (floats exact, nulls empty). `test_research_note_contains_canonical_values_and_audit`: the Markdown note contains every metric's canonical display, the summary headline, evidence and source/model/prompt/schema/hash. Audit panel lists source, hashes, snapshot/parser/normalizer versions, model, prompt, schema, temperature, run timestamps and status history. |
+| **Manual check** | `uvicorn` + `streamlit run` on a seeded database: timeline, meeting detail, market reaction and audit tabs render at 1400 px and at 375 px without horizontal scrolling (`docs/images/`). |
+| **Docs** | ARCHITECTURE (Phase 5 implementation, API routes), RUNBOOK (running the API and dashboard, `FEDTONE_UI__*`), README, PROJECT_STRUCTURE, PHASES, PROJECT_PHASES_AND_TASKS, `.env.example`, this ledger. |
+| **Notes** | The dashboard reads only the API over HTTP (`fedtone.ui.client`), so it imports no infrastructure and its numbers are the API's. Timeline, document list and exports all come from `ResearchQueryService.signals()`. Metric text uses the same `metric_display` as research summaries. Adapter builders moved from `cli.py` to `fedtone.infrastructure.factories` so the CLI and API share them. New optional dependencies: `streamlit` and `plotly` (`pip install -e ".[dashboard]"`), as named in the architecture's technology stack. |
 
 ---
 

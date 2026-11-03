@@ -218,6 +218,15 @@ class SqlAlchemyProcessingRunRepository:
             _apply_run(row, run)
             session.commit()
 
+    def list_recent(self, *, limit: int = 20) -> Sequence[ProcessingRun]:
+        query = (
+            select(ProcessingRunRow)
+            .order_by(ProcessingRunRow.started_at.desc(), ProcessingRunRow.id)
+            .limit(limit)
+        )
+        with self._session_factory() as session:
+            return [_run_to_domain(row) for row in session.scalars(query).all()]
+
 
 def _review_to_domain(row: ReviewItemRow) -> ReviewItem:
     return ReviewItem(

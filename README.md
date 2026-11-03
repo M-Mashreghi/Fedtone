@@ -25,6 +25,8 @@ federalreserve.gov ─► Collect & normalize ─► LLM tone analysis ─► Ev
 | **Historical analogues** | The earlier meetings whose tone profile is most similar, and how markets reacted then. Only information available before the meeting is used. | `fedtone analogues DOCUMENT_ID` |
 | **Research summary** | A short LLM-written note that may only quote numbers already computed by FedTone (copied verbatim, sign included). Causal wording is rejected. | `fedtone summarize` |
 | **Review queue** | Anything uncertain (parse problems, missing evidence, invalid model output) goes to a human review list instead of being silently accepted. | `fedtone reviews`, `fedtone resolve` |
+| **Research API** | Documents, tone analyses, comparisons, market reactions, analogues, review queue, pipeline runs and telemetry under `/api/v1`, with OpenAPI docs at `/docs`. | `uvicorn ...` |
+| **Dashboard** | Streamlit research UI: tone timeline, meeting detail with evidence beside the score, statement diff, market reaction, analogues, audit trail and CSV/JSON/Markdown exports. | `streamlit run ...` |
 | **Model benchmark** | Agreement, stability and evidence quality of the configured model against a labeled dataset, as a Markdown/JSON report. | `fedtone benchmark` |
 
 Every stored result records its model, prompt version, schema version and metric version, so an
@@ -39,7 +41,7 @@ git clone https://github.com/M-Mashreghi/Fedtone.git
 cd Fedtone
 python -m venv .venv
 # Windows: .venv\Scripts\activate    macOS/Linux: source .venv/bin/activate
-pip install -e ".[dev]"
+pip install -e ".[dev,dashboard]"   # "dashboard" adds Streamlit + Plotly
 
 cp .env.example .env          # then fill in the values you need (never commit .env)
 alembic upgrade head          # creates ./data/fedtone.db by default
@@ -110,15 +112,33 @@ fedtone summarize
 fedtone benchmark --dataset tests/fixtures/eval/mini_benchmark.json --repeats 3 --output reports/
 ```
 
-### 7. Run the API
+### 7. Run the API and the dashboard
 
 ```bash
 uvicorn fedtone.api.app:create_default_app --factory --reload
-# GET http://127.0.0.1:8000/healthz   liveness
-# GET http://127.0.0.1:8000/ready     database readiness
+streamlit run src/fedtone/ui/dashboard.py     # in a second terminal
 ```
 
-Research endpoints and the dashboard are planned for Phase 5.
+The API serves interactive docs at `http://127.0.0.1:8000/docs`, plus `/healthz` (liveness)
+and `/ready` (database readiness). Research routes, all under `/api/v1`:
+
+| Route | Returns |
+|---|---|
+| `GET /documents` | Stored tone signal per document; filters `central_bank`, `document_type`, `status`, `model`, `published_from`, `published_to`; `limit`/`offset`. |
+| `GET /documents/{id}` | Source, text, score, evidence, comparison/diff, market reaction, summary, open reviews and audit. |
+| `GET /documents/{id}/analysis`, `/comparison`, `/market-reaction`, `/analogues`, `/audit` | The individual parts. |
+| `GET /documents/{id}/research-note` | Markdown research note. |
+| `GET /timeline`, `GET /exports/signals?format=csv` (or `json`) | The same signal records, for charts and downloads. |
+| `POST /pipeline/{stage}` with `ingest`, `analyze`, `reactions` or `summarize` | Runs a stage now; re-running retries provider failures. |
+| `GET /reviews`, `POST /reviews/{id}/resolve` | Review queue; `{"note": "...", "resume": true}` continues the document. |
+| `GET /runs`, `GET /system/telemetry` | Ingestion runs, document counts per status, active versions. |
+
+The dashboard reads the API at `FEDTONE_UI__API_BASE_URL` (default `http://127.0.0.1:8000`).
+Pick a meeting on the timeline, then read its score next to the evidence, the language changes,
+the market reaction and the audit trail. It also works on a phone-width screen.
+
+![Dashboard timeline](docs/images/dashboard-timeline.jpg)
+![Meeting detail](docs/images/dashboard-meeting-detail.jpg)
 
 ### 8. Develop and test
 
@@ -144,7 +164,8 @@ src/fedtone/
   domain/           pure research logic: tone schema, diff, evidence, calendars, metrics, analogues
   application/      services and ports: ingestion, tone analysis, market reaction, summaries
   infrastructure/   adapters: FOMC source, OpenAI-compatible LLM, FRED/CSV market data, SQLite
-  api/              FastAPI app
+  api/              FastAPI app: research routes, response schemas, pipeline wiring
+  ui/               Streamlit dashboard (reads the API over HTTP)
   cli.py            the `fedtone` command
 migrations/         Alembic schema migrations
 tests/              unit and integration tests with saved fixtures
@@ -159,7 +180,7 @@ docs/               architecture, roadmap, phases, task ledger, runbook
 | 2 | Official FOMC ingestion and normalization | Implemented; closes once captured live pages pass the fixture tests |
 | 3 | LLM hawkish/dovish tone engine | Implemented with a fake LLM; closes after a human-labeled benchmark on a real model |
 | 4 | Market reaction, historical analogues, research summaries | Done with fixture market data; live FRED fetch still to be checked |
-| 5 | Research API and dashboard | Planned |
+| 5 | Research API and dashboard | Done (verified with fixture data) |
 | 6 | Hardening, Docker, production readiness | Planned |
 | 7 | Multi-bank, speeches, agentic research | Planned |
 
@@ -178,4 +199,5 @@ FedTone بیانیه‌های رسمی فدرال رزرو (FOMC) را جمع‌
 می‌دهد. سپس تغییرات زبان نسبت به جلسه‌ی قبل را نشان می‌دهد، واکنش بازار (بازده سهام، تغییر بازده
 اوراق خزانه به واحد bps و شاخص دلار) را با کد قطعی پایتون محاسبه می‌کند، جلسه‌های مشابه تاریخی را
 بدون سوگیری نگاه به آینده پیدا می‌کند و یک یادداشت پژوهشی کوتاه می‌نویسد که فقط اعداد محاسبه‌شده را
-نقل می‌کند. هیچ عدد مالی توسط مدل زبانی ساخته نمی‌شود و نتایج توصیه‌ی سرمایه‌گذاری نیستند.
+نقل می‌کند. همه‌ی این نتایج از طریق یک API و یک داشبورد Streamlit قابل مشاهده و خروجی‌گرفتن
+(CSV/JSON/Markdown) هستند. هیچ عدد مالی توسط مدل زبانی ساخته نمی‌شود و نتایج توصیه‌ی سرمایه‌گذاری نیستند.

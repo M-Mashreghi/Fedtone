@@ -510,7 +510,7 @@ FedTone should explain a meeting in readable macro-finance language while preser
 
 ### Task 5.1: Core Research REST API
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Completed
 
 **Business Value / User Story**  
 UI, notebooks and future agents need one stable access layer for FedTone data.
@@ -523,14 +523,14 @@ UI, notebooks and future agents need one stable access layer for FedTone data.
 
 **Definition of Done (DoD)**
 
-- [ ] Core endpoint contract tests pass.
-- [ ] Route handlers contain no duplicated analysis logic.
+- [x] Core endpoint contract tests pass.
+- [x] Route handlers contain no duplicated analysis logic.
 
 ---
 
 ### Task 5.2: Policy Tone Timeline Dashboard
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Completed
 
 **Business Value / User Story**  
 A user should understand the historical direction of Fed communication at a glance.
@@ -544,14 +544,14 @@ A user should understand the historical direction of Fed communication at a glan
 
 **Definition of Done (DoD)**
 
-- [ ] Chart values equal API values.
-- [ ] Missing/review meetings visibly distinguished.
+- [x] Chart values equal API values.
+- [x] Missing/review meetings visibly distinguished.
 
 ---
 
 ### Task 5.3: Meeting Detail, Evidence & Statement Diff View
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Completed
 
 **Business Value / User Story**  
 Users need to inspect why the score changed, not just see a number.
@@ -567,14 +567,14 @@ Users need to inspect why the score changed, not just see a number.
 
 **Definition of Done (DoD)**
 
-- [ ] Selected meeting displays all persisted evidence/deltas correctly.
-- [ ] No score shown without source/audit context.
+- [x] Selected meeting displays all persisted evidence/deltas correctly.
+- [x] No score shown without source/audit context.
 
 ---
 
 ### Task 5.4: Market Reaction & Historical Analogue View
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Completed
 
 **Business Value / User Story**  
 A user should connect communication changes to the market-data context around the event.
@@ -588,14 +588,14 @@ A user should connect communication changes to the market-data context around th
 
 **Definition of Done (DoD)**
 
-- [ ] Displayed metrics exactly match canonical analytics records.
-- [ ] Point-in-time warning shown for historical/backtest mode.
+- [x] Displayed metrics exactly match canonical analytics records.
+- [x] Point-in-time warning shown for historical/backtest mode.
 
 ---
 
 ### Task 5.5: Audit, Filters & Research Export
 
-**Status:** `[ ]` Not Started
+**Status:** `[x]` Completed
 
 **Business Value / User Story**  
 A portfolio project should be reproducible and easy to inspect/export.
@@ -609,9 +609,9 @@ A portfolio project should be reproducible and easy to inspect/export.
 
 **Definition of Done (DoD)**
 
-- [ ] Export values equal API/database records.
-- [ ] Audit panel shows required reproducibility metadata.
-- [ ] Completing Task 5.5 closes v1.0.
+- [x] Export values equal API/database records.
+- [x] Audit panel shows required reproducibility metadata.
+- [x] Completing Task 5.5 closes v1.0.
 
 ---
 

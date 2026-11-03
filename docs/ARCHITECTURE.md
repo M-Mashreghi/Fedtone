@@ -291,14 +291,8 @@ FedTone reports **association and historical reaction**, not causal proof. The L
 
 A single **FastAPI** application exposes research data and orchestration commands.
 
-Representative API groups:
-
-- `/api/v1/documents`
-- `/api/v1/analysis`
-- `/api/v1/comparisons`
-- `/api/v1/events`
-- `/api/v1/market-reactions`
-- `/api/v1/system`
+API groups (OpenAPI tags): `documents`, `analysis`, `comparisons`, `market-reactions`,
+`exports` and `system`, all under `/api/v1` (see Implementation (Phase 5) below).
 
 Business logic lives in services/modules, not route handlers.
 
@@ -317,6 +311,37 @@ Primary screens:
 7. Analysis Audit / Evidence
 
 A React/Next.js UI can replace Streamlit later without changing domain contracts.
+
+### Implementation (Phase 5)
+
+- **Read model** — `fedtone.application.research_queries.ResearchQueryService` assembles
+  stored records (document, latest analysis, comparison, metrics, summary, open reviews,
+  snapshot/text) and never recalculates them. `signal_record()` is the single flat record
+  behind `/documents`, `/timeline` and `/exports/signals`, so a chart, a list and an export
+  cannot disagree. `metric_record()` adds the canonical `metric_display()` text used by
+  research summaries and flags `backtest_mode` when `as_of` is more than one hour before
+  `computed_at` (an explicit `--as-of` cut-off).
+- **Exports** — `fedtone.application.research_export`: CSV/JSON of signal records at full
+  precision and a Markdown research note built from the same stored records.
+- **Pipeline runs** — `fedtone.application.pipeline.PipelineService` dispatches
+  `ingest | analyze | reactions | summarize` to runners built in `fedtone.api.pipeline` from
+  the same services and adapters as the CLI (`fedtone.infrastructure.factories`). A stage
+  whose provider is not configured returns 409; an aborted run returns 502. Retrying is the
+  normal behavior of each stage (provider failures resume at the last good stage); review
+  items are resolved with `POST /reviews/{id}/resolve`.
+- **Routes** (`fedtone.api.routes`, schemas in `fedtone.api.schemas`), all under `/api/v1`:
+  `GET /documents`, `GET /documents/{id}` and its `/analysis`, `/comparison`,
+  `/market-reaction`, `/analogues`, `/audit`, `/research-note`; `GET /timeline`;
+  `GET /exports/signals?format=csv|json`; `POST /pipeline/{stage}`; `GET /runs`;
+  `GET /reviews`, `POST /reviews/{id}/resolve`; `GET /system/telemetry`. Filters:
+  `central_bank`, `document_type`, `status`, `model`, `published_from`, `published_to`
+  (timezone-aware). OpenAPI at `/docs`.
+- **Dashboard** — `fedtone.ui.dashboard` (Streamlit) reads only the API through
+  `fedtone.ui.client` (httpx), so it imports no infrastructure and shows exactly the API's
+  numbers. `fedtone.ui.views` arranges payloads into tables and Plotly figures without
+  computing anything; market values carry the API's display text and units (yields in bps,
+  returns in %). Meetings in review or without a score are drawn as separate markers;
+  analogues always carry a point-in-time note, backtest metrics a warning.
 
 ---
 

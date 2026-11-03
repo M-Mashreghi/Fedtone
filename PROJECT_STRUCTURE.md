@@ -26,16 +26,20 @@ FedTone/
 │       ├── cli.py          # ingest, reviews, analyze, resolve, benchmark, reactions, analogues, summarize
 │       ├── domain/         # lifecycle, models (+ guard), text, linking, tone_schema, evidence, diff, market, calendar, metrics, analogues, summary
 │       ├── application/    # ports, sources, ingestion, llm, prompts, tone_analysis, review, evaluation,
-│       │                   # market_data, market_reaction, analogue_search, research_summary
+│       │                   # market_data, market_reaction, analogue_search, research_summary,
+│       │                   # research_queries, research_export, pipeline
 │       ├── infrastructure/
 │       │   ├── persistence/ # db.py, orm.py, repositories.py
 │       │   ├── sources/    # http.py (retry), fomc.py, manual.py
 │       │   ├── llm/        # openai_compatible.py
-│       │   └── market/     # fred.py (FRED CSV + local CSV providers)
-│       ├── api/            # app.py: FastAPI factory, /healthz, /ready
-│       └── ui/
+│       │   ├── market/     # fred.py (FRED CSV + local CSV providers)
+│       │   └── factories.py # adapter construction shared by CLI and API
+│       ├── api/            # app.py (factory, /healthz, /ready), routes.py (/api/v1),
+│       │                   # schemas.py, pipeline.py (stage runners)
+│       └── ui/             # dashboard.py (Streamlit), client.py (API client), views.py
 ├── tests/
-│   ├── api/
+│   ├── api/                # research API contract tests
+│   ├── ui/                 # dashboard view helpers + Streamlit AppTest smoke tests
 │   ├── unit/               # includes layer import-boundary test
 │   ├── integration/        # migrations + repositories on fresh SQLite
 │   ├── fake_llm.py         # scripted LLM used by tests (no network)
@@ -50,5 +54,6 @@ FedTone/
     ├── TASKS.md
     ├── DIAGRAMS.md
     ├── DEPLOYMENT.md
-    └── RUNBOOK.md
+    ├── RUNBOOK.md
+    └── images/             # dashboard screenshots
 ```

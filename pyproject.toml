@@ -24,6 +24,11 @@ dependencies = [
 fedtone = "fedtone.cli:main"
 
 [project.optional-dependencies]
+# Streamlit research dashboard (reads the API over HTTP).
+dashboard = [
+    "streamlit>=1.45",
+    "plotly>=5.20",
+]
 dev = [
     "pytest>=8.0",
     "ruff>=0.6",

@@ -36,6 +36,27 @@ docker compose logs --tail 200 api
 
 If API is healthy but dashboard is empty, inspect document counts and latest processing runs before rerunning ingestion.
 
+### Research API and dashboard (Phase 5)
+
+```bash
+uvicorn fedtone.api.app:create_default_app --factory --port 8000
+streamlit run src/fedtone/ui/dashboard.py          # needs pip install -e ".[dashboard]"
+curl -fsS http://localhost:8000/api/v1/system/telemetry   # counts per status, open reviews, runs, versions
+curl -fsS http://localhost:8000/api/v1/runs
+curl -fsS -X POST http://localhost:8000/api/v1/pipeline/ingest   # also analyze | reactions | summarize
+curl -fsS -X POST http://localhost:8000/api/v1/reviews/ITEM_ID/resolve \
+     -H 'Content-Type: application/json' -d '{"note": "checked", "resume": true}'
+```
+
+- Dashboard shows "Cannot load data from the FedTone API": check `FEDTONE_UI__API_BASE_URL`
+  and that `/healthz` answers on that address.
+- `POST /pipeline/{stage}` returns **409**: the stage's provider is not configured (LLM key and
+  model, or market-data provider); the message names the missing setting. **502**: the run
+  aborted on a permanent provider error; documents were left untouched. Re-running a stage
+  retries documents that failed on a provider outage.
+- Pipeline requests run synchronously; long ingestions may take minutes. Use the CLI for bulk
+  backfills.
+
 ---
 
 ## 3. Official FOMC Ingestion Failure
@@ -308,6 +329,8 @@ docker compose up -d
 | `FEDTONE_MARKET_DATA__WINDOWS` | JSON list of event windows, default `["[0,0]","[0,+1]","[0,+5]"]`. |
 | `FEDTONE_MARKET_DATA__BENCHMARK_SYMBOL` | Optional benchmark for excess returns (same calendar). |
 | `FEDTONE_MARKET_DATA__ANALOGUE_TOP_K` / `__ANALOGUE_MIN_SAMPLE` | Analogue search defaults. |
+| `FEDTONE_UI__API_BASE_URL` | Research API address used by the dashboard (default `http://127.0.0.1:8000`). |
+| `FEDTONE_UI__TIMEOUT_SECONDS` | Dashboard request timeout. |
 | `FEDTONE_LOG_LEVEL` | Application log verbosity. |
 | `BACKUP_RETENTION_COUNT` | Number of local DB backups to retain (planned, Task 6.5). |
 
@@ -320,3 +343,4 @@ docker compose up -d
 | 2026-10-13 | Initial FedTone operational runbook created. |
 | 2026-10-13 | Phase 3: `analyze`, `resolve`, `benchmark` commands and LLM config keys. |
 | 2026-10-13 | Phase 4: `reactions`, `documents`, `analogues`, `summarize` commands and market-data keys. |
+| 2026-11-03 | Phase 5: research API routes, pipeline/review endpoints, dashboard and `FEDTONE_UI__*` keys. |

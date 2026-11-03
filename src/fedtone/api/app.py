@@ -1,28 +1,73 @@
 """FastAPI application factory."""
 
 import logging
+from collections.abc import Mapping
 
 from fastapi import FastAPI, Response, status
 from sqlalchemy import Engine
 
 from fedtone import __version__
-from fedtone.infrastructure.persistence.db import create_db_engine, database_is_ready
+from fedtone.api.pipeline import AdapterFactories, default_stage_runners
+from fedtone.api.routes import Services, router
+from fedtone.application.analogue_search import AnalogueService
+from fedtone.application.pipeline import PipelineService, PipelineStage, StageRunner
+from fedtone.application.research_queries import ResearchQueryService
+from fedtone.application.review import ReviewService
+from fedtone.infrastructure.persistence.db import (
+    create_db_engine,
+    create_session_factory,
+    database_is_ready,
+)
+from fedtone.infrastructure.persistence.repositories import (
+    SqlAlchemyComparisonRepository,
+    SqlAlchemyEventMetricRepository,
+    SqlAlchemyPolicyDocumentRepository,
+    SqlAlchemyProcessingRunRepository,
+    SqlAlchemyResearchSummaryRepository,
+    SqlAlchemyReviewItemRepository,
+    SqlAlchemySourceSnapshotRepository,
+    SqlAlchemyToneAnalysisRepository,
+)
 from fedtone.observability import configure_logging
 from fedtone.settings import Settings, get_settings
 
 logger = logging.getLogger(__name__)
 
 
-def create_app(settings: Settings | None = None, engine: Engine | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    engine: Engine | None = None,
+    *,
+    adapter_factories: AdapterFactories | None = None,
+    stage_runners: Mapping[PipelineStage, StageRunner] | None = None,
+) -> FastAPI:
+    """Build the API. ``adapter_factories`` / ``stage_runners`` replace the external
+    adapters used by pipeline runs (tests pass fakes)."""
     settings = settings or get_settings()
-    app = FastAPI(title="FedTone API", version=__version__)
+    app = FastAPI(
+        title="FedTone API",
+        version=__version__,
+        description="Central-bank communication research data: documents, tone analyses, "
+        "comparisons, market reactions, exports and pipeline runs.",
+    )
     app.state.engine = engine
+    app.state.services_instance = None
 
     def get_engine() -> Engine:
         # Created on first use so importing the app has no filesystem side effects.
         if app.state.engine is None:
             app.state.engine = create_db_engine(settings.database.url)
         return app.state.engine
+
+    def services() -> Services:
+        if app.state.services_instance is None:
+            app.state.services_instance = _build_services(
+                settings, get_engine(), adapter_factories, stage_runners
+            )
+        return app.state.services_instance
+
+    app.state.services = services
+    app.include_router(router)
 
     @app.get("/healthz", tags=["system"])
     def healthz() -> dict[str, str]:
@@ -42,6 +87,41 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
         }
 
     return app
+
+
+def _build_services(
+    settings: Settings,
+    engine: Engine,
+    adapter_factories: AdapterFactories | None,
+    stage_runners: Mapping[PipelineStage, StageRunner] | None,
+) -> Services:
+    session_factory = create_session_factory(engine)
+    documents = SqlAlchemyPolicyDocumentRepository(session_factory)
+    analyses = SqlAlchemyToneAnalysisRepository(session_factory)
+    comparisons = SqlAlchemyComparisonRepository(session_factory)
+    metrics = SqlAlchemyEventMetricRepository(session_factory)
+    reviews = SqlAlchemyReviewItemRepository(session_factory)
+    if stage_runners is None:
+        stage_runners = default_stage_runners(settings, session_factory, adapter_factories)
+    return Services(
+        queries=ResearchQueryService(
+            documents=documents,
+            snapshots=SqlAlchemySourceSnapshotRepository(session_factory),
+            analyses=analyses,
+            comparisons=comparisons,
+            metrics=metrics,
+            summaries=SqlAlchemyResearchSummaryRepository(session_factory),
+            reviews=reviews,
+            runs=SqlAlchemyProcessingRunRepository(session_factory),
+        ),
+        analogues=AnalogueService(
+            documents=documents, analyses=analyses, comparisons=comparisons, metrics=metrics
+        ),
+        reviews=ReviewService(documents, reviews),
+        pipeline=PipelineService(stage_runners),
+        analogue_top_k=settings.market_data.analogue_top_k,
+        analogue_min_sample=settings.market_data.analogue_min_sample,
+    )
 
 
 def create_default_app() -> FastAPI:

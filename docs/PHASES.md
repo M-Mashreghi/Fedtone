@@ -234,7 +234,7 @@ Attach deterministic market-data and event-study analytics to policy events whil
 
 ## Phase 5: Research API & Dashboard
 
-**Status:** `[ ]` Not Started  
+**Status:** `[x]` Completed — verified with fake LLM / fixture market data through the API and Streamlit AppTest; narrow viewport checked at 375 px.  
 **Roadmap alignment:** M4 v1.0
 
 ### Scope
@@ -277,11 +277,11 @@ Expose the FedTone dataset and workflow through a documented API and a polished 
 
 ### Definition of Done (DoD)
 
-- [ ] User can select a meeting and see source, score, diff, evidence and market reaction.
-- [ ] Timeline filters and charts match API values.
-- [ ] Export reproduces displayed canonical metrics.
-- [ ] Audit metadata is visible for every published analysis.
-- [ ] Primary dashboard flows work on desktop and narrow viewport.
+- [x] User can select a meeting and see source, score, diff, evidence and market reaction.
+- [x] Timeline filters and charts match API values.
+- [x] Export reproduces displayed canonical metrics.
+- [x] Audit metadata is visible for every published analysis.
+- [x] Primary dashboard flows work on desktop and narrow viewport.
 
 ### Automated Test Criteria
 

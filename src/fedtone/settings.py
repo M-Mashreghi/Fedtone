@@ -119,6 +119,12 @@ class MarketDataSettings(BaseModel):
         return value or None
 
 
+class UISettings(BaseModel):
+    # The dashboard reads everything through the research API.
+    api_base_url: str = "http://127.0.0.1:8000"
+    timeout_seconds: float = Field(default=30.0, gt=0)
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="FEDTONE_",
@@ -135,6 +141,7 @@ class Settings(BaseSettings):
     sources: SourceSettings = SourceSettings()
     scheduler: SchedulerSettings = SchedulerSettings()
     market_data: MarketDataSettings = MarketDataSettings()
+    ui: UISettings = UISettings()
 
     @model_validator(mode="after")
     def _require_production_secrets(self) -> "Settings":
