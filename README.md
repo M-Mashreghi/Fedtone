@@ -71,6 +71,21 @@ fedtone resolve ITEM_ID --note "checked against the PDF" --resume
 fedtone documents           # list what is stored
 ```
 
+### Other central banks
+
+The same pipeline also ingests ECB monetary policy decisions, Bank of England Monetary Policy
+Summaries and SNB monetary policy assessments (PDF):
+
+```bash
+fedtone ingest --bank ECB --type monetary_policy_decision
+fedtone ingest --bank BOE --type monetary_policy_summary
+fedtone ingest --bank SNB --type monetary_policy_assessment
+```
+
+Every command accepts the same `--bank` / `--type` pair. `FEDTONE_SOURCES__ENABLED` chooses
+which sources `fedtone schedule` runs. Tone prompts and market instruments are still the shared
+defaults (bank-specific profiles are the next Phase 7 task).
+
 ### 2. Score tone and see what changed
 
 ```bash
@@ -199,7 +214,7 @@ docs/               architecture, roadmap, phases, task ledger, runbook
 | 4 | Market reaction, historical analogues, research summaries | Done with fixture market data; live FRED fetch still to be checked |
 | 5 | Research API and dashboard | Done (verified with fixture data) |
 | 6 | Hardening, Docker, production readiness | Done (Docker verified in CI) |
-| 7 | Multi-bank, speeches, agentic research | Planned |
+| 7 | Multi-bank, speeches, agentic research | In progress: ECB, BoE and SNB sources done |
 
 ## Documentation
 

@@ -7,7 +7,7 @@ This document decomposes the product into **granular, atomic, strictly testable*
 | Meta | Value |
 |---|---|
 | **Project** | FedTone — LLM-Powered Central Bank Policy Analyzer |
-| **Current status** | `[-]` Phase 2 in progress — 2.1, 2.3, 2.5 completed; 2.2, 2.4 await official-page fixtures |
+| **Current status** | `[-]` Phase 7 in progress — Task 7.1 completed; Phases 1, 2, 4, 5, 6 completed; Phase 3 awaits a real-model benchmark |
 | **Primary MVP** | FOMC statements → tone scoring → statement diff → market reaction → dashboard |
 | **Status legend** | `[ ]` Not Started · `[-]` In Progress · `[x]` Completed |
 | **Related docs** | [ARCHITECTURE](./ARCHITECTURE.md) · [ROADMAP](./ROADMAP.md) · [PHASES](./PHASES.md) · [DIAGRAMS](./DIAGRAMS.md) · [TASKS](./TASKS.md) · [DEPLOYMENT](./DEPLOYMENT.md) · [RUNBOOK](./RUNBOOK.md) |
@@ -181,7 +181,7 @@ As the platform, FedTone needs replaceable source adapters so adding ECB/SNB/BoE
 
 ### Task 2.2: Official FOMC Statement Discovery & Fetch Adapter
 
-**Status:** `[-]` In Progress — implemented; pending official-page fixture verification
+**Status:** `[x]` Completed — verified on captured official pages (2026-11-03)
 
 **Business Value / User Story**  
 As a macro researcher, I want official FOMC statements automatically collected so the research corpus does not depend on manual copy/paste or news summaries.
@@ -195,7 +195,7 @@ As a macro researcher, I want official FOMC statements automatically collected s
 
 **Definition of Done (DoD)**
 
-- [ ] Curated FOMC fixtures discover/fetch correctly. *(passes on synthetic layout fixtures; official snapshots not yet captured)*
+- [x] Curated FOMC fixtures discover/fetch correctly.
 - [x] Transient failure retry boundedly.
 - [x] Permanent parsing failure becomes structured error/review record.
 
@@ -225,7 +225,7 @@ As a researcher, I must be able to prove exactly which source content produced a
 
 ### Task 2.4: Policy Text Parser & Conservative Normalizer
 
-**Status:** `[-]` In Progress — implemented; pending official-page fixture verification
+**Status:** `[x]` Completed — verified on captured official pages (2026-11-03)
 
 **Business Value / User Story**  
 The LLM and comparator need clean policy text without losing wording that may carry monetary-policy meaning.
@@ -239,8 +239,8 @@ The LLM and comparator need clean policy text without losing wording that may ca
 
 **Definition of Done (DoD)**
 
-- [ ] Fixture expected paragraphs preserved. *(passes on synthetic layout fixtures; official snapshots not yet captured)*
-- [ ] Boilerplate excluded. *(passes on synthetic layout fixtures; official snapshots not yet captured)*
+- [x] Fixture expected paragraphs preserved.
+- [x] Boilerplate excluded.
 - [x] Raw input remains recoverable for audit.
 
 ---
@@ -732,13 +732,13 @@ Research history, prompt/model metadata and human review decisions must be recov
 
 ### Task 7.1: ECB, SNB & BoE Official Source Adapters
 
-**Status:** `[ ]` Future
+**Status:** `[x]` Completed
 
 **Definition of Done (DoD)**
 
-- [ ] Each bank uses the shared adapter contract.
-- [ ] Fixture suites cover discovery/parser drift.
-- [ ] No FOMC pipeline fork.
+- [x] Each bank uses the shared adapter contract.
+- [x] Fixture suites cover discovery/parser drift.
+- [x] No FOMC pipeline fork.
 
 ---
 
@@ -824,15 +824,15 @@ Agents:
 | Phase | Tasks | Not Started | In Progress | Completed |
 |---|---|---:|---:|---:|
 | 1 Foundation | 1.1–1.5 | 0 | 0 | 5 |
-| 2 FOMC Ingestion | 2.1–2.5 | 0 | 2 | 3 |
+| 2 FOMC Ingestion | 2.1–2.5 | 0 | 0 | 5 |
 | 3 Tone Engine | 3.1–3.5 | 0 | 1 | 4 |
 | 4 Market Analytics | 4.1–4.5 | 0 | 0 | 5 |
-| 5 Dashboard & API | 5.1–5.5 | 5 | 0 | 0 |
-| 6 Production | 6.1–6.5 | 5 | 0 | 0 |
-| 7 Expansion | 7.1–7.5 | 5 | 0 | 0 |
-| **Total** | **35** | **15** | **3** | **17** |
+| 5 Dashboard & API | 5.1–5.5 | 0 | 0 | 5 |
+| 6 Production | 6.1–6.5 | 0 | 1 | 4 |
+| 7 Expansion | 7.1–7.5 | 4 | 0 | 1 |
+| **Total** | **35** | **4** | **2** | **29** |
 
-**Project status:** Phase 1 completed; Phase 2 implemented, awaiting verification against captured official FOMC pages; Phase 3 implemented and verified with a fake LLM, awaiting a human-labeled FOMC benchmark and a real-model run; Phase 4 completed (verified with fake/fixture market data and a fake LLM).
+**Project status:** Phases 1, 2, 4 and 5 completed; Phase 2 verified on captured official FOMC pages; Phase 3 implemented and verified with a fake LLM, awaiting a human-labeled FOMC benchmark and a real-model run; Phase 6 completed except branch protection (a GitHub setting); Phase 7 Task 7.1 (ECB, BoE and SNB adapters) completed.
 
 ---
 

@@ -48,6 +48,26 @@ class SourceSettings(BaseModel):
     fomc_listing_urls: list[str] = [
         "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm"
     ]
+    # Empty: the ECB adapter reads the yearly decision lists of the current and previous year.
+    ecb_listing_urls: list[str] = []
+    boe_listing_urls: list[str] = ["https://www.bankofengland.co.uk/rss/news"]
+    snb_listing_urls: list[str] = [
+        "https://www.snb.ch/en/the-snb/mandates-goals/monetary-policy/decisions"
+    ]
+    # Sources the scheduler cycles over, as "BANK/document_type".
+    enabled: list[str] = ["FED/fomc_statement"]
+
+    @field_validator("enabled")
+    @classmethod
+    def _bank_slash_type(cls, value: list[str]) -> list[str]:
+        for item in value:
+            bank, _, doc_type = item.partition("/")
+            if not bank or not doc_type:
+                raise ValueError(f"source {item!r} must look like BANK/document_type")
+        return value
+
+    def enabled_pairs(self) -> list[tuple[str, str]]:
+        return [tuple(item.split("/", 1)) for item in self.enabled]
 
 
 class SchedulerSettings(BaseModel):

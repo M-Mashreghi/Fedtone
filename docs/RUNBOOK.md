@@ -103,6 +103,23 @@ stored bytes without hitting the live site.
 
 ---
 
+### Other central banks (Phase 7.1)
+
+```bash
+fedtone ingest --bank ECB --type monetary_policy_decision
+fedtone ingest --bank BOE --type monetary_policy_summary
+fedtone ingest --bank SNB --type monetary_policy_assessment
+fedtone analyze --bank ECB --type monetary_policy_decision
+python scripts/capture_bank_fixtures.py      # save live pages, then:
+pytest tests/unit/test_bank_live_fixtures.py
+```
+
+Layout drift on any of these sites raises `PermanentSourceError`, so the document goes to the
+review queue instead of being mis-parsed. Re-capture live pages and compare them with the
+synthetic fixtures in `tests/fixtures/<bank>/synthetic/` to see what changed.
+
+---
+
 ## 4. LLM Provider Failure / Model Retirement
 
 **Symptoms:** 401/403, model-not-found, 429, timeout, malformed structured output.
@@ -352,6 +369,9 @@ FEDTONE_DATABASE__URL=sqlite:///./tmp/drill.db fedtone documents
 | `FEDTONE_SOURCES__USER_AGENT` / `__TIMEOUT_SECONDS` | HTTP identity and timeout for official sources. |
 | `FEDTONE_SOURCES__MAX_RETRIES` / `__BACKOFF_SECONDS` | Bounded retry with exponential backoff. |
 | `FEDTONE_SOURCES__FOMC_LISTING_URLS` | JSON list of pages scanned for statement links. |
+| `FEDTONE_SOURCES__ECB_LISTING_URLS` | ECB decision lists to scan; empty = current and previous year. |
+| `FEDTONE_SOURCES__BOE_LISTING_URLS` / `__SNB_LISTING_URLS` | BoE (RSS by default) and SNB listing pages. |
+| `FEDTONE_SOURCES__ENABLED` | JSON list of `BANK/type` pairs for `fedtone schedule`, e.g. `["FED/fomc_statement","ECB/monetary_policy_decision"]`. |
 | `FEDTONE_MARKET_DATA__PROVIDER` | Market-data backend. |
 | `FEDTONE_MARKET_DATA__API_KEY` | Optional provider key (FRED CSV needs none). |
 | `FEDTONE_MARKET_DATA__CSV_DIRECTORY` | Folder of `<SYMBOL>.csv` files for the `csv` provider. |
@@ -375,3 +395,4 @@ FEDTONE_DATABASE__URL=sqlite:///./tmp/drill.db fedtone documents
 | 2026-10-13 | Phase 4: `reactions`, `documents`, `analogues`, `summarize` commands and market-data keys. |
 | 2026-11-03 | Phase 5: research API routes, pipeline/review endpoints, dashboard and `FEDTONE_UI__*` keys. |
 | 2026-11-03 | Phase 6: `publish`, `schedule`, `backup`, `restore`; detailed `/ready`; provider counters; Docker procedures. |
+| 2026-11-03 | Phase 7.1: ECB, BoE and SNB sources (`--bank ECB --type monetary_policy_decision`, etc.), `FEDTONE_SOURCES__ENABLED`, live-page capture script. |

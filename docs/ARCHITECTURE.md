@@ -113,6 +113,27 @@ New dependencies: `httpx` (HTTP client with transport mocking for tests), `beaut
 (HTML parsing with the standard-library parser, no lxml needed), `tzdata` on Windows only
 (time-zone database for `zoneinfo`).
 
+### Implementation (Phase 7, Task 7.1)
+
+More official sources use the same contract, ingestion service, linking and analysis:
+
+| Bank / document type | Adapter | Discovery | Content | Release time (UTC-converted) |
+|---|---|---|---|---|
+| `ECB/monetary_policy_decision` | `sources.ecb.EcbDecisionAdapter` | yearly decision lists (`/press/govcdec/mopo/YYYY/html/index_include.en.html`, current + previous year) | press-release HTML (`div.section`) | 14:15 Frankfurt (13:45 before 2022) |
+| `BOE/monetary_policy_summary` | `sources.boe.BoeSummaryAdapter` | news RSS feed | Monetary Policy Summary section of the summary-and-minutes page | 12:00 London |
+| `SNB/monetary_policy_assessment` | `sources.snb.SnbAssessmentAdapter` | monetary policy decisions page | PDF linked from the press-release page; paragraphs rebuilt from wrapped lines | 09:30 Zurich |
+
+Release times are the banks' published schedules (not stated on the pages); they only
+matter for event alignment, and all fall before the European and US closes. The canonical
+identity of an SNB document is its press-release page URL, while its snapshot stores the PDF
+bytes. `FEDTONE_SOURCES__ENABLED` lists the `BANK/type` pairs the scheduler cycles over
+(default: FOMC only). Shared helpers live in `sources.common`.
+
+Limitations until Tasks 7.2+: the tone prompt and dimensions are the shared defaults, and
+market reactions use the configured instruments (US by default) for every bank.
+
+New dependency: `pypdf` (pure Python) to read SNB assessment PDFs.
+
 ### Ingestion Guarantees
 
 - Canonical URLs and content hashes prevent duplicate ingestion.

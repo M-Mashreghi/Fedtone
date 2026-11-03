@@ -66,7 +66,7 @@ Create the Python project foundation, research-domain models, SQLite persistence
 
 ## Phase 2: Official FOMC Ingestion & Document Normalization
 
-**Status:** `[-]` In Progress — implemented; awaiting verification on captured official pages  
+**Status:** `[x]` Completed — verified on captured official pages (2026-11-03)  
 **Roadmap alignment:** M1 Alpha completion
 
 ### Scope
@@ -95,9 +95,9 @@ Build the official-source ingestion pipeline for FOMC statements, immutable raw 
 
 ### Definition of Done (DoD)
 
-- [ ] Historical FOMC fixture set ingests successfully. *(passes on synthetic fixtures; official snapshots pending)*
+- [x] Historical FOMC fixture set ingests successfully.
 - [x] Re-running ingestion creates no duplicate canonical records.
-- [ ] Parsed text preserves policy wording and paragraph order. *(passes on synthetic fixtures; official snapshots pending)*
+- [x] Parsed text preserves policy wording and paragraph order.
 - [x] Each statement links to the correct previous comparable statement.
 - [x] Raw source hash and canonical URL are stored.
 - [x] Parser failure creates structured failure/review state.
@@ -349,7 +349,7 @@ Add end-to-end coverage, scheduled ingestion, observability, Docker, CI/CD, back
 
 ## Phase 7: Multi-Bank, Speech Analytics & Agentic Research
 
-**Status:** `[ ]` Future  
+**Status:** `[-]` In Progress — Task 7.1 (ECB, BoE, SNB adapters) completed  
 **Roadmap alignment:** M6 Future
 
 ### Scope
@@ -383,10 +383,10 @@ Extend the stable FOMC system into a broader central-bank research platform and 
 
 ### Definition of Done (DoD)
 
-- [ ] New banks use the same core domain contracts without forked pipelines.
+- [x] New banks use the same core domain contracts without forked pipelines.
 - [ ] Bank/document-type calibration is explicit.
 - [ ] Agentic report cannot publish unsupported claims without citations.
-- [ ] Existing FOMC regression suite remains green.
+- [x] Existing FOMC regression suite remains green. *(re-check after each Phase 7 task)*
 
 ---
 

@@ -40,8 +40,9 @@ class CycleReport:
     id: UUID = field(default_factory=uuid4)
     finished_at: datetime | None = None
     results: list[PipelineResult] = field(default_factory=list)
-    skipped: dict[PipelineStage, str] = field(default_factory=dict)
-    errors: dict[PipelineStage, str] = field(default_factory=dict)
+    # Keyed by stage, or by "BANK/type:stage" when several sources are scheduled.
+    skipped: dict[str, str] = field(default_factory=dict)
+    errors: dict[str, str] = field(default_factory=dict)
 
     @property
     def healthy(self) -> bool:
@@ -53,14 +54,14 @@ class PipelineScheduler:
         self,
         pipeline: PipelineService,
         *,
-        central_bank: str = "FED",
-        document_type: str = "fomc_statement",
+        sources: Sequence[tuple[str, str]] = (("FED", "fomc_statement"),),
         stages: Sequence[PipelineStage] = CYCLE,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self._pipeline = pipeline
-        self._bank = central_bank
-        self._type = document_type
+        if not sources:
+            raise ValueError("at least one source is required")
+        self._sources = tuple(sources)
         self._stages = tuple(stages)
         self._clock = clock
         self._lock = threading.Lock()
@@ -79,22 +80,22 @@ class PipelineScheduler:
             self._lock.release()
 
     def _run_stages(self, report: CycleReport) -> None:
-        for stage in self._stages:
-            try:
-                result = self._pipeline.run(
-                    stage, self._bank, self._type, trigger=RunTrigger.SCHEDULED
-                )
-            except StageUnavailableError as exc:
-                logger.info("stage %s skipped: %s", stage, exc)
-                report.skipped[stage] = str(exc)
-                continue
-            except Exception as exc:  # noqa: BLE001 - one stage must not stop the cycle
-                logger.exception("stage %s crashed", stage)
-                report.errors[stage] = f"{exc.__class__.__name__}: {exc}"
-                continue
-            report.results.append(result)
-            if not result.succeeded:
-                logger.error("stage %s aborted: %s", stage, result.aborted)
+        for bank, doc_type in self._sources:
+            for stage in self._stages:
+                label = stage if len(self._sources) == 1 else f"{bank}/{doc_type}:{stage}"
+                try:
+                    result = self._pipeline.run(stage, bank, doc_type, trigger=RunTrigger.SCHEDULED)
+                except StageUnavailableError as exc:
+                    logger.info("stage %s skipped: %s", label, exc)
+                    report.skipped[label] = str(exc)
+                    continue
+                except Exception as exc:  # noqa: BLE001 - one stage must not stop the cycle
+                    logger.exception("stage %s crashed", label)
+                    report.errors[label] = f"{exc.__class__.__name__}: {exc}"
+                    continue
+                report.results.append(result)
+                if not result.succeeded:
+                    logger.error("stage %s aborted: %s", label, result.aborted)
         report.finished_at = self._clock()
         logger.info(
             "pipeline cycle finished: %s",

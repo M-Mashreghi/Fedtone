@@ -30,3 +30,11 @@ data/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Captured ECB/BoE/SNB pages stay local until their reuse terms are reviewed (then: git add -f).
+tests/fixtures/ecb/live/*
+tests/fixtures/boe/live/*
+tests/fixtures/snb/live/*
+!tests/fixtures/ecb/live/README.md
+!tests/fixtures/boe/live/README.md
+!tests/fixtures/snb/live/README.md

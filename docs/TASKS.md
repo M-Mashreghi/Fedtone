@@ -74,23 +74,23 @@ Documentation and repository conventions. No production logic yet.
 ## Phase 2 — Official FOMC Ingestion & Normalization
 
 - [x] **Task 2.1** `CentralBankSourceAdapter` abstraction and registry.
-- [-] **Task 2.2** Official FOMC statement discovery/fetch adapter. *(verify on captured official pages)*
+- [x] **Task 2.2** Official FOMC statement discovery/fetch adapter.
 - [x] **Task 2.3** Raw snapshot, hash and canonical metadata persistence.
-- [-] **Task 2.4** Policy-text parser and conservative normalizer. *(verify on captured official pages)*
+- [x] **Task 2.4** Policy-text parser and conservative normalizer.
 - [x] **Task 2.5** Previous comparable statement linker + idempotent ingestion workflow.
 
 ### Verification — Phase 2
 
 | Item | Detail |
 |---|---|
-| **Status** | `[-]` In Progress — all tasks implemented; 2.2/2.4 await official-page fixtures. |
+| **Status** | `[x]` Completed — verified on captured official FOMC pages on 2026-11-03 (see Open item). |
 | **Tests** | `pytest`: 252 passed, 2 skipped (live-fixture tests, no captured pages yet) on Python 3.12 in a fresh virtual environment. `ruff check` / `ruff format --check` clean. |
 | **Task 2.1** | `tests/unit/test_source_registry.py`: resolve by bank/type, explicit `UnsupportedSourceError`, duplicate registration rejected, ordered listing, adapter contract suite (manual adapter). |
 | **Task 2.2** | `tests/unit/test_fomc_adapter.py` (synthetic layout fixtures): calendar discovery excludes PDFs/implementation notes/minutes/duplicates/off-site links; EST and EDT release times → UTC; wrong-page, missing-container and date-mismatch → `PermanentSourceError`. `tests/unit/test_http_fetcher.py`: exponential backoff, bounded retries, 4xx not retried. |
 | **Task 2.3** | `tests/integration/test_ingestion.py`: raw bytes + SHA-256 stored; identical reingestion adds nothing; changed text → snapshot v2 + review item, stored text kept; chrome-only change → new snapshot, no revision. Migration `0002` checked against ORM. |
 | **Task 2.4** | `tests/unit/test_text_normalization.py`: NFC, NBSP/whitespace collapse, punctuation/quotes preserved, idempotent. Ingestion test checks paragraph order and boilerplate exclusion. |
 | **Task 2.5** | `tests/unit/test_linking.py`: publication-order links, strictly-earlier (no look-ahead), backfill relinks, bank/type grouping. Ingestion tests: two runs → one record set; transient failure → `Failed` then resumed and relinked; permanent failure → one review item; post-analysis link change → review item, no rewrite. `tests/integration/test_cli.py`: `fedtone ingest` twice is idempotent. |
-| **Open item** | federalreserve.gov was unreachable from the build environment (proxy 403), so parser fixtures are synthetic pages modeled on the site layout. Run `python scripts/capture_fomc_fixtures.py`, then `pytest tests/unit/test_fomc_live_fixtures.py`; if they pass, mark 2.2/2.4 completed and close Phase 2. |
+| **Live verification** | Closed 2026-11-03: `scripts/capture_fomc_fixtures.py` saved the calendar and five statements (2023-12-13 … 2024-12-18) to `tests/fixtures/fomc/live/` (U.S. Government works, committed). `tests/unit/test_fomc_live_fixtures.py` (6 passed) parses each and discovers statements from the calendar; `tests/integration/test_ingestion_live.py` ingests all five through `IngestionService`, links them in release order and re-runs idempotently. |
 | **Docs** | ARCHITECTURE (Phase 2 implementation, new dependencies), RUNBOOK (commands, failure table, config keys), DIAGRAMS (state machine aligned with the Task 1.3 guard), README, PROJECT_STRUCTURE, PHASES, PROJECT_PHASES_AND_TASKS, this ledger. |
 | **Notes** | Documents without a parsed publication time are not linked and get a review item. A document whose fetch failed is skipped as a link anchor until it succeeds; affected successors are relinked automatically while not yet analyzed. |
 
@@ -198,7 +198,7 @@ Documentation and repository conventions. No production logic yet.
 
 ## Phase 7 — Multi-Bank & Agentic Research Expansion
 
-- [ ] **Task 7.1** ECB/SNB/BoE source adapters.
+- [x] **Task 7.1** ECB/SNB/BoE source adapters.
 - [ ] **Task 7.2** Bank-specific scoring profiles and calibration.
 - [ ] **Task 7.3** Speeches/minutes + speaker-level tone analytics.
 - [ ] **Task 7.4** Agentic research workflow with skeptic/evidence reviewer.
@@ -208,9 +208,12 @@ Documentation and repository conventions. No production logic yet.
 
 | Item | Detail |
 |---|---|
-| **Status** | `[ ]` Future |
-| **Tests** | Cross-bank regression, evidence support and agent-review gates. |
-| **Notes** | Must not regress FOMC v1 behavior. |
+| **Status** | `[-]` In Progress — Task 7.1 completed. |
+| **Tests** | `pytest`: 576 passed, 0 skipped on Python 3.14 with captured live pages present (CI has only the committed FOMC captures, so the ECB/BoE/SNB live tests skip there). `ruff check` / `ruff format --check` clean. |
+| **Task 7.1** | Adapters `ecb.EcbDecisionAdapter` (`ECB/monetary_policy_decision`, yearly decision lists + HTML), `boe.BoeSummaryAdapter` (`BOE/monetary_policy_summary`, news RSS + HTML, summary only, minutes excluded) and `snb.SnbAssessmentAdapter` (`SNB/monetary_policy_assessment`, decisions page → press-release page → PDF). `tests/unit/test_bank_adapters.py` (25): one contract test per bank (discover oldest-first without duplicates, fetch, parse); text, dates and release times in UTC; boilerplate, headings, minutes and PDF page headers excluded; paragraphs rebuilt across PDF page breaks; off-site, duplicate and non-decision links ignored; drift cases (title, container, date mismatch, missing date, missing PDF link, unreadable or wrong PDF) raise `PermanentSourceError`. `tests/integration/test_multi_bank.py` (7): registry holds all four banks; each bank ingests idempotently, links to its own previous document and is analyzed and compared by the unchanged `AnalysisService`; banks never link across each other; the scheduler cycles over `FEDTONE_SOURCES__ENABLED`. |
+| **Live verification** | 2026-11-03: `scripts/capture_bank_fixtures.py` captured three ECB decisions (2024), two BoE summaries (2026) and three SNB assessment PDFs (2026); `tests/unit/test_bank_live_fixtures.py` 8/8 passed. These captures are git-ignored until their reuse terms are reviewed. |
+| **Docs** | ARCHITECTURE (Phase 7.1 implementation, `pypdf`), RUNBOOK (commands, keys), README, PROJECT_STRUCTURE, PHASES, PROJECT_PHASES_AND_TASKS, `.env.example`, this ledger. |
+| **Notes** | Release times are each bank's published schedule (ECB 14:15 CET from 2022, 13:45 before; BoE 12:00 London; SNB 09:30 Zurich), not page content. Tone prompts and market instruments are still the shared FOMC-era defaults: bank-specific prompt profiles are Task 7.2, and market reactions for non-US banks use the configured (US by default) instruments until per-bank instruments are added. New dependency: `pypdf` (SNB publishes assessments only as PDF). |
 
 ---
 

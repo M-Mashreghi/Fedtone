@@ -313,10 +313,14 @@ def _schedule(args: argparse.Namespace, settings: Settings) -> int:
         )
         return 2
     session_factory = create_session_factory(create_db_engine(settings.database.url))
+    sources = (
+        [(args.bank, args.type)] if args.bank or args.type else settings.sources.enabled_pairs()
+    )
+    if args.bank and args.type is None or args.type and args.bank is None:
+        print("error: pass both --bank and --type, or neither", file=sys.stderr)
+        return 2
     scheduler = PipelineScheduler(
-        PipelineService(default_stage_runners(settings, session_factory)),
-        central_bank=args.bank,
-        document_type=args.type,
+        PipelineService(default_stage_runners(settings, session_factory)), sources=sources
     )
     if args.once:
         report = scheduler.run_cycle()
@@ -435,6 +439,8 @@ def build_parser() -> argparse.ArgumentParser:
             sub.add_argument("--as-of", help="only use data available at this ISO time")
         if name == "schedule":
             sub.add_argument("--once", action="store_true", help="run one cycle and exit")
+            # Default: every source in FEDTONE_SOURCES__ENABLED.
+            sub.set_defaults(bank=None, type=None)
 
     backup = commands.add_parser("backup", help="verified SQLite snapshot")
     backup.add_argument("--dir", help="backup directory (default FEDTONE_BACKUP__DIRECTORY)")

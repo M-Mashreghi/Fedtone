@@ -16,7 +16,8 @@ FedTone/
 ├── .env.example
 ├── migrations/             # Alembic env + versions/0001–0004
 ├── scripts/
-│   └── capture_fomc_fixtures.py  # saves official pages into tests/fixtures/fomc/live
+│   ├── capture_fomc_fixtures.py  # saves official pages into tests/fixtures/fomc/live
+│   └── capture_bank_fixtures.py  # ECB/BoE/SNB pages into tests/fixtures/<bank>/live
 ├── .claude/
 │   └── rules/
 │       ├── architecture.md
@@ -35,7 +36,7 @@ FedTone/
 │       │                   # research_queries, research_export, pipeline, publication, scheduler
 │       ├── infrastructure/
 │       │   ├── persistence/ # db.py, orm.py, repositories.py, backup.py
-│       │   ├── sources/    # http.py (retry), fomc.py, manual.py
+│       │   ├── sources/    # http.py (retry), fomc.py, ecb.py, boe.py, snb.py (PDF), common.py, manual.py
 │       │   ├── llm/        # openai_compatible.py
 │       │   ├── market/     # fred.py (FRED CSV + local CSV providers)
 │       │   ├── factories.py # adapter construction shared by CLI and API
@@ -51,7 +52,7 @@ FedTone/
 │   ├── fake_llm.py         # scripted LLM used by tests (no network)
 │   ├── fake_market.py      # in-memory market-data provider
 │   ├── market_harness.py   # analyzed statements ready for market linking
-│   └── fixtures/           # fomc/ pages; eval/ benchmark; market/ FRED-format CSVs
+│   └── fixtures/           # fomc/ (+ live captures), ecb/ boe/ snb/, eval/ benchmark, market/ CSVs
 └── docs/
     ├── ARCHITECTURE.md
     ├── ROADMAP.md
