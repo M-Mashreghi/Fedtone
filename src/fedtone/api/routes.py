@@ -26,6 +26,7 @@ from fedtone.api.schemas import (
     SignalRecord,
     TelemetryOut,
     TimelineOut,
+    ToneProfileOut,
     document_detail_out,
     market_reaction_out,
 )
@@ -41,6 +42,7 @@ from fedtone.application.research_queries import (
 )
 from fedtone.application.research_summary import SUMMARY_PROMPT_VERSION
 from fedtone.application.review import ReviewService
+from fedtone.application.tone_profiles import GENERIC, PROFILES
 from fedtone.domain.diff import DIFF_VERSION
 from fedtone.domain.lifecycle import DocumentStatus
 from fedtone.domain.metrics import METRIC_VERSION
@@ -286,6 +288,14 @@ def resolve_review(item_id: UUID, body: ResolveIn, services: ServicesDep) -> Rev
     except ValueError as exc:
         raise HTTPException(http.HTTP_409_CONFLICT, str(exc)) from exc
     return ReviewOut.of(item)
+
+
+@router.get("/system/tone-profiles", response_model=list[ToneProfileOut], tags=["system"])
+def tone_profiles() -> list[ToneProfileOut]:
+    """Bank/document-type context added to tone prompts. All profiles share one output
+    schema and the -1..+1 scale; levels are calibrated within a profile, not across them."""
+    items = [ToneProfileOut.of(key, profile) for key, profile in sorted(PROFILES.items())]
+    return [*items, ToneProfileOut.of(None, GENERIC)]
 
 
 @router.get("/system/telemetry", response_model=TelemetryOut, tags=["system"])

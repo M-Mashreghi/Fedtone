@@ -129,8 +129,30 @@ identity of an SNB document is its press-release page URL, while its snapshot st
 bytes. `FEDTONE_SOURCES__ENABLED` lists the `BANK/type` pairs the scheduler cycles over
 (default: FOMC only). Shared helpers live in `sources.common`.
 
-Limitations until Tasks 7.2+: the tone prompt and dimensions are the shared defaults, and
-market reactions use the configured instruments (US by default) for every bank.
+Limitation: market reactions use the configured instruments (US by default) for every bank.
+
+### Implementation (Phase 7, Task 7.2) — Tone Profiles and Calibration Limits
+
+`fedtone.application.tone_profiles` holds one explicit profile per bank and document type
+(`fed-fomc-statement-v1`, `ecb-mp-decision-v1`, `boe-mps-v1`, `snb-mpa-v1`) plus
+`generic-v1` for any other source. A profile adds institutional context to the system prompt:
+institution, document, policy instrument, mandate/target, how the bank's concepts map to the
+five shared dimensions (e.g. SNB FX interventions → `balance_sheet`; ECB wage growth →
+`labor` only as an inflation driver) and reading notes (vote splits, standard guidance
+phrases). It never changes the output schema, the -1..+1 scale or the label bands, and all
+validators are unchanged. `GET /api/v1/system/tone-profiles` lists them.
+
+The stored prompt version is `<shared prompt>+<profile id>`
+(e.g. `tone-statement-v2+ecb-mp-decision-v1`; the signal record exposes `tone_profile`).
+Because deltas, comparisons and analogue search only combine analyses with identical
+model/prompt/schema versions, scores from different profiles are never mixed.
+
+**Calibration limits.** Scores are calibrated within one bank and document type: a +0.3 from
+the ECB and a +0.3 from the Fed each mean "moderately hawkish for that institution", not the
+same stance. Cross-bank level comparisons are descriptive only; the dashboard draws one line
+per bank and warns when a view mixes profiles. Profiles are prompt context, not a statistical
+calibration; a per-bank labeled benchmark (as for the FOMC, Task 3.5) is needed before scores
+are used quantitatively. Editing a profile requires bumping its version suffix.
 
 New dependency: `pypdf` (pure Python) to read SNB assessment PDFs.
 
@@ -225,7 +247,8 @@ Every analysis must return schema-valid JSON containing:
   material dimension (abs score >= 0.2) needs at least one supported quote.
 - `fedtone.domain.diff` — deterministic sentence diff (added/removed/changed) and tone deltas
   computed from stored scores. No previous document means a baseline, not an error.
-- `fedtone.application.prompts` — versioned prompts (`tone-statement-v1`, `tone-comparison-v1`).
+- `fedtone.application.prompts` — versioned prompts (`tone-statement-v2`, `tone-comparison-v2`;
+  v1 had no profile section).
   Source text is wrapped once in delimiters it cannot close; instruction-like text is flagged
   and blocks publication.
 - `fedtone.application.tone_analysis` — `AnalysisService`: analyze queued documents, retry

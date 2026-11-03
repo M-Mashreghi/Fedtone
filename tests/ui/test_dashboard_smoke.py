@@ -29,7 +29,7 @@ def test_dashboard_shows_meeting_with_score_evidence_and_audit(client, harness) 
     assert metrics["Net tone"] == "-0.10"
     assert metrics["Confidence"] == "0.80"
     captions = " ".join(c.value for c in app.caption)
-    assert "manual://mar" in captions and "tone-statement-v1" in captions
+    assert "manual://mar" in captions and "tone-statement-v2+fed-fomc-statement-v1" in captions
     assert [t.label for t in app.tabs] == [
         "Overview",
         "Statement diff",

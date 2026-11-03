@@ -53,7 +53,10 @@ def _filters_sidebar(points: list[dict[str, Any]]) -> dict[str, Any]:
 
 def _header(detail: dict[str, Any]) -> None:
     signal, audit = detail["signal"], detail["audit"]
-    st.subheader(f"{detail['title'] or signal['document_type']} - {signal['published_at'][:10]}")
+    st.subheader(
+        f"{signal['central_bank']} - {detail['title'] or signal['document_type']} - "
+        f"{signal['published_at'][:10]}"
+    )
     st.caption(
         f"Source: [{audit['source_url']}]({audit['source_url']}) - "
         f"hash `{(audit['content_hash'] or 'n/a')[:12]}` - "
@@ -201,6 +204,9 @@ def main() -> None:
         return
     st.plotly_chart(views.timeline_figure(points, dimension))
     st.caption("Red X: needs review. Grey circle: no score for this series.")
+    note = views.cross_profile_note(points)
+    if note:
+        st.warning(note)
 
     labels = {p["document_id"]: views.meeting_label(p) for p in points}
     ids = list(labels)

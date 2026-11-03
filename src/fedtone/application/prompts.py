@@ -14,11 +14,13 @@ from collections.abc import Sequence
 from datetime import datetime
 
 from fedtone.application.llm import LLMRequest
+from fedtone.application.tone_profiles import GENERIC, ToneProfile
 from fedtone.domain.diff import StatementDiff
 from fedtone.domain.tone_schema import ComparisonOutput, ToneAnalysisOutput
 
-STATEMENT_PROMPT_VERSION = "tone-statement-v1"
-COMPARISON_PROMPT_VERSION = "tone-comparison-v1"
+# v2: adds the bank/document-type profile section (fedtone.application.tone_profiles).
+STATEMENT_PROMPT_VERSION = "tone-statement-v2"
+COMPARISON_PROMPT_VERSION = "tone-comparison-v2"
 
 OPEN = "<<<SOURCE_DOCUMENT"
 CLOSE = "<<<END_SOURCE_DOCUMENT>>>"
@@ -107,11 +109,17 @@ def statement_request(
     published_at: datetime | None,
     paragraphs: Sequence[str],
     temperature: float,
+    profile: ToneProfile = GENERIC,
 ) -> LLMRequest:
     schema = ToneAnalysisOutput.model_json_schema()
     user = _document_block("current", title, published_at, "\n\n".join(paragraphs))
     return LLMRequest(
-        system=_RULES + "\n" + _STATEMENT_TASK + json.dumps(schema),
+        system=_RULES
+        + "\n"
+        + profile.prompt_section()
+        + "\n"
+        + _STATEMENT_TASK
+        + json.dumps(schema),
         user=user,
         schema_name="tone_analysis",
         json_schema=schema,
@@ -129,6 +137,7 @@ def comparison_request(
     previous_paragraphs: Sequence[str],
     diff: StatementDiff,
     temperature: float,
+    profile: ToneProfile = GENERIC,
 ) -> LLMRequest:
     schema = ComparisonOutput.model_json_schema()
     diff_lines = (
@@ -148,7 +157,12 @@ def comparison_request(
         ]
     )
     return LLMRequest(
-        system=_RULES + "\n" + _COMPARISON_TASK + json.dumps(schema),
+        system=_RULES
+        + "\n"
+        + profile.prompt_section()
+        + "\n"
+        + _COMPARISON_TASK
+        + json.dumps(schema),
         user=user,
         schema_name="tone_comparison",
         json_schema=schema,

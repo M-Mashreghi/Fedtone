@@ -199,7 +199,7 @@ Documentation and repository conventions. No production logic yet.
 ## Phase 7 — Multi-Bank & Agentic Research Expansion
 
 - [x] **Task 7.1** ECB/SNB/BoE source adapters.
-- [ ] **Task 7.2** Bank-specific scoring profiles and calibration.
+- [x] **Task 7.2** Bank-specific scoring profiles and calibration.
 - [ ] **Task 7.3** Speeches/minutes + speaker-level tone analytics.
 - [ ] **Task 7.4** Agentic research workflow with skeptic/evidence reviewer.
 - [ ] **Task 7.5** RAG historical memory, alerts and optional intraday extension.
@@ -208,12 +208,13 @@ Documentation and repository conventions. No production logic yet.
 
 | Item | Detail |
 |---|---|
-| **Status** | `[-]` In Progress — Task 7.1 completed. |
-| **Tests** | `pytest`: 576 passed, 0 skipped on Python 3.14 with captured live pages present (CI has only the committed FOMC captures, so the ECB/BoE/SNB live tests skip there). `ruff check` / `ruff format --check` clean. |
+| **Status** | `[-]` In Progress — Tasks 7.1 and 7.2 completed. |
+| **Tests** | `pytest`: 591 passed, 0 skipped on Python 3.14 (after 7.2; 576 after 7.1) with captured live pages present (CI has only the committed FOMC captures, so the ECB/BoE/SNB live tests skip there). `ruff check` / `ruff format --check` clean. |
 | **Task 7.1** | Adapters `ecb.EcbDecisionAdapter` (`ECB/monetary_policy_decision`, yearly decision lists + HTML), `boe.BoeSummaryAdapter` (`BOE/monetary_policy_summary`, news RSS + HTML, summary only, minutes excluded) and `snb.SnbAssessmentAdapter` (`SNB/monetary_policy_assessment`, decisions page → press-release page → PDF). `tests/unit/test_bank_adapters.py` (25): one contract test per bank (discover oldest-first without duplicates, fetch, parse); text, dates and release times in UTC; boilerplate, headings, minutes and PDF page headers excluded; paragraphs rebuilt across PDF page breaks; off-site, duplicate and non-decision links ignored; drift cases (title, container, date mismatch, missing date, missing PDF link, unreadable or wrong PDF) raise `PermanentSourceError`. `tests/integration/test_multi_bank.py` (7): registry holds all four banks; each bank ingests idempotently, links to its own previous document and is analyzed and compared by the unchanged `AnalysisService`; banks never link across each other; the scheduler cycles over `FEDTONE_SOURCES__ENABLED`. |
-| **Live verification** | 2026-11-03: `scripts/capture_bank_fixtures.py` captured three ECB decisions (2024), two BoE summaries (2026) and three SNB assessment PDFs (2026); `tests/unit/test_bank_live_fixtures.py` 8/8 passed. These captures are git-ignored until their reuse terms are reviewed. |
-| **Docs** | ARCHITECTURE (Phase 7.1 implementation, `pypdf`), RUNBOOK (commands, keys), README, PROJECT_STRUCTURE, PHASES, PROJECT_PHASES_AND_TASKS, `.env.example`, this ledger. |
-| **Notes** | Release times are each bank's published schedule (ECB 14:15 CET from 2022, 13:45 before; BoE 12:00 London; SNB 09:30 Zurich), not page content. Tone prompts and market instruments are still the shared FOMC-era defaults: bank-specific prompt profiles are Task 7.2, and market reactions for non-US banks use the configured (US by default) instruments until per-bank instruments are added. New dependency: `pypdf` (SNB publishes assessments only as PDF). |
+| **Live verification** | 2026-11-03: `scripts/capture_bank_fixtures.py` captured three ECB decisions (2024), two BoE summaries (2026) and three SNB assessment PDFs (2026), committed under `tests/fixtures/<bank>/live/` with source acknowledgement; `tests/unit/test_bank_live_fixtures.py` 8/8 passed and also runs in CI. |
+| **Task 7.2** | `fedtone.application.tone_profiles`: explicit profiles for FED, ECB, BoE and SNB plus `generic-v1`; prompts bumped to `tone-statement-v2` / `tone-comparison-v2`; stored prompt version `<prompt>+<profile>`. `tests/unit/test_tone_profiles.py` (14): every registered source has a non-generic profile; each profile maps exactly the five shared dimensions; ids unique and versioned; FED and ECB prompts differ in context but share the scale text, label bands, schema and injection rules; unknown sources fall back to the generic, uncalibrated profile; the analyzer sends and records the document's profile; the dashboard warns on mixed profiles and draws one line per bank. `tests/api/test_research_api.py`: `tone_profile` in signal records and `GET /api/v1/system/tone-profiles`. Updated version expectations in existing tests (`tone-statement-v2+fed-fomc-statement-v1`). |
+| **Docs** | ARCHITECTURE (Phase 7.1 implementation, `pypdf`; Task 7.2 profiles and calibration limits), RUNBOOK (commands, keys), README, PROJECT_STRUCTURE, PHASES, PROJECT_PHASES_AND_TASKS, `.env.example`, this ledger. |
+| **Notes** | Release times are each bank's published schedule (ECB 14:15 CET from 2022, 13:45 before; BoE 12:00 London; SNB 09:30 Zurich), not page content. Market reactions for non-US banks use the configured (US by default) instruments until per-bank instruments are added. Tone profiles are prompt context, not a statistical calibration: a per-bank labeled benchmark is still needed before cross-bank scores are used quantitatively. Analyses stored before 7.2 (`tone-statement-v1`) are not mixed with v2 analyses in deltas or analogues; re-run `fedtone analyze` on new documents only. New dependency: `pypdf` (SNB publishes assessments only as PDF). |
 
 ---
 

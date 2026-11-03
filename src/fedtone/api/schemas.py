@@ -19,6 +19,7 @@ from fedtone.application.research_queries import (
     metric_sort_key,
     signal_record,
 )
+from fedtone.application.tone_profiles import ToneProfile
 from fedtone.domain.models import (
     DocumentComparison,
     ProcessingRun,
@@ -49,6 +50,7 @@ class SignalRecord(BaseModel):
     analysis_id: UUID | None
     model: str | None
     prompt_version: str | None
+    tone_profile: str | None
     schema_version: str | None
     analyzed_at: datetime | None
     content_hash: str | None
@@ -455,6 +457,32 @@ class TelemetryOut(BaseModel):
             recent_runs=[RunOut.of(r) for r in telemetry.recent_runs],
             versions=versions,
             providers=providers,
+        )
+
+
+class ToneProfileOut(BaseModel):
+    id: str
+    central_bank: str | None
+    document_type: str | None
+    institution: str
+    document: str
+    policy_instrument: str
+    mandate: str
+    dimension_guidance: dict[str, str]
+    notes: list[str]
+
+    @classmethod
+    def of(cls, key: tuple[str, str] | None, profile: ToneProfile) -> "ToneProfileOut":
+        return cls(
+            id=profile.id,
+            central_bank=key[0] if key else None,
+            document_type=key[1] if key else None,
+            institution=profile.institution,
+            document=profile.document,
+            policy_instrument=profile.policy_instrument,
+            mandate=profile.mandate,
+            dimension_guidance=dict(profile.dimension_guidance),
+            notes=list(profile.notes),
         )
 
 

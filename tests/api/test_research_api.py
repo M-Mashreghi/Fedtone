@@ -94,7 +94,7 @@ def test_document_detail_shows_source_score_diff_evidence_and_reaction(client, h
     assert audit["source_url"] == jan.source_url
     assert audit["content_hash"] == jan.content_hash == audit["analysis_document_hash"]
     assert audit["model"] == "fake-model-1"
-    assert audit["prompt_version"] == "tone-statement-v1"
+    assert audit["prompt_version"] == "tone-statement-v2+fed-fomc-statement-v1"
     assert audit["schema_version"] == "tone-analysis-1.0"
     assert audit["parser_version"] == "manual-text-1"
     assert audit["raw_hash"] and audit["snapshot_version"] == 1
@@ -344,3 +344,20 @@ def test_openapi_documents_research_routes(client) -> None:
         "/api/v1/system/telemetry",
     ):
         assert path in paths
+
+
+def test_signals_name_the_tone_profile_and_profiles_are_listed(client) -> None:
+    points = client.get("/api/v1/timeline").json()["points"]
+    profiles = client.get("/api/v1/system/tone-profiles").json()
+
+    assert {p["tone_profile"] for p in points} == {"fed-fomc-statement-v1"}
+    by_id = {p["id"]: p for p in profiles}
+    assert {"fed-fomc-statement-v1", "ecb-mp-decision-v1", "boe-mps-v1", "snb-mpa-v1"} <= set(by_id)
+    assert by_id["generic-v1"]["central_bank"] is None
+    assert set(by_id["snb-mpa-v1"]["dimension_guidance"]) == {
+        "inflation",
+        "labor",
+        "growth",
+        "policy_guidance",
+        "balance_sheet",
+    }

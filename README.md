@@ -83,8 +83,10 @@ fedtone ingest --bank SNB --type monetary_policy_assessment
 ```
 
 Every command accepts the same `--bank` / `--type` pair. `FEDTONE_SOURCES__ENABLED` chooses
-which sources `fedtone schedule` runs. Tone prompts and market instruments are still the shared
-defaults (bank-specific profiles are the next Phase 7 task).
+which sources `fedtone schedule` runs. Each bank is scored with its own tone profile (mandate,
+policy instrument, how its concepts map to the five dimensions) on the shared -1..+1 scale;
+levels are calibrated within a bank, so compare direction and changes across banks, not
+levels. Market reactions still use the configured (US) instruments.
 
 ### 2. Score tone and see what changed
 
@@ -214,7 +216,7 @@ docs/               architecture, roadmap, phases, task ledger, runbook
 | 4 | Market reaction, historical analogues, research summaries | Done with fixture market data; live FRED fetch still to be checked |
 | 5 | Research API and dashboard | Done (verified with fixture data) |
 | 6 | Hardening, Docker, production readiness | Done (Docker verified in CI) |
-| 7 | Multi-bank, speeches, agentic research | In progress: ECB, BoE and SNB sources done |
+| 7 | Multi-bank, speeches, agentic research | In progress: ECB, BoE and SNB sources and tone profiles done |
 
 ## Documentation
 

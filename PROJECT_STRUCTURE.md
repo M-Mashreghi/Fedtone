@@ -31,7 +31,7 @@ FedTone/
 │       ├── observability.py # JSON logging, correlation ids, secret scrubbing
 │       ├── cli.py          # ingest … summarize, publish, schedule, backup, restore
 │       ├── domain/         # lifecycle, models (+ guard), text, linking, tone_schema, evidence, diff, market, calendar, metrics, analogues, summary
-│       ├── application/    # ports, sources, ingestion, llm, prompts, tone_analysis, review, evaluation,
+│       ├── application/    # ports, sources, ingestion, llm, prompts, tone_profiles, tone_analysis, review, evaluation,
 │       │                   # market_data, market_reaction, analogue_search, research_summary,
 │       │                   # research_queries, research_export, pipeline, publication, scheduler
 │       ├── infrastructure/

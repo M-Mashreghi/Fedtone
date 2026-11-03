@@ -7,7 +7,7 @@ This document decomposes the product into **granular, atomic, strictly testable*
 | Meta | Value |
 |---|---|
 | **Project** | FedTone — LLM-Powered Central Bank Policy Analyzer |
-| **Current status** | `[-]` Phase 7 in progress — Task 7.1 completed; Phases 1, 2, 4, 5, 6 completed; Phase 3 awaits a real-model benchmark |
+| **Current status** | `[-]` Phase 7 in progress — Tasks 7.1 and 7.2 completed; Phases 1, 2, 4, 5, 6 completed; Phase 3 awaits a real-model benchmark |
 | **Primary MVP** | FOMC statements → tone scoring → statement diff → market reaction → dashboard |
 | **Status legend** | `[ ]` Not Started · `[-]` In Progress · `[x]` Completed |
 | **Related docs** | [ARCHITECTURE](./ARCHITECTURE.md) · [ROADMAP](./ROADMAP.md) · [PHASES](./PHASES.md) · [DIAGRAMS](./DIAGRAMS.md) · [TASKS](./TASKS.md) · [DEPLOYMENT](./DEPLOYMENT.md) · [RUNBOOK](./RUNBOOK.md) |
@@ -744,12 +744,12 @@ Research history, prompt/model metadata and human review decisions must be recov
 
 ### Task 7.2: Bank-Specific Tone Calibration Profiles
 
-**Status:** `[ ]` Future
+**Status:** `[x]` Completed
 
 **Definition of Done (DoD)**
 
-- [ ] Bank/document-type prompt profile explicit.
-- [ ] Common overall scale retained with documented calibration limits.
+- [x] Bank/document-type prompt profile explicit.
+- [x] Common overall scale retained with documented calibration limits.
 
 ---
 
@@ -829,10 +829,10 @@ Agents:
 | 4 Market Analytics | 4.1–4.5 | 0 | 0 | 5 |
 | 5 Dashboard & API | 5.1–5.5 | 0 | 0 | 5 |
 | 6 Production | 6.1–6.5 | 0 | 1 | 4 |
-| 7 Expansion | 7.1–7.5 | 4 | 0 | 1 |
-| **Total** | **35** | **4** | **2** | **29** |
+| 7 Expansion | 7.1–7.5 | 3 | 0 | 2 |
+| **Total** | **35** | **3** | **2** | **30** |
 
-**Project status:** Phases 1, 2, 4 and 5 completed; Phase 2 verified on captured official FOMC pages; Phase 3 implemented and verified with a fake LLM, awaiting a human-labeled FOMC benchmark and a real-model run; Phase 6 completed except branch protection (a GitHub setting); Phase 7 Task 7.1 (ECB, BoE and SNB adapters) completed.
+**Project status:** Phases 1, 2, 4 and 5 completed; Phase 2 verified on captured official FOMC pages; Phase 3 implemented and verified with a fake LLM, awaiting a human-labeled FOMC benchmark and a real-model run; Phase 6 completed except branch protection (a GitHub setting); Phase 7 Tasks 7.1 (ECB, BoE and SNB adapters) and 7.2 (tone profiles) completed.
 
 ---
 

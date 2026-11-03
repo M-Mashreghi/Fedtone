@@ -89,7 +89,7 @@ def test_full_analysis_and_comparison_path(session_factory) -> None:
     assert analysis.document_hash == jan.content_hash
     assert (analysis.model, analysis.prompt_version, analysis.schema_version) == (
         "fake-model-1",
-        "tone-statement-v1",
+        "tone-statement-v2+fed-fomc-statement-v1",
         "tone-analysis-1.0",
     )
     assert analysis.temperature == 0.0
@@ -108,7 +108,10 @@ def test_full_analysis_and_comparison_path(session_factory) -> None:
     assert jan_cmp.dimension_deltas["balance_sheet"] is None
     assert jan_cmp.diff["removed"] or jan_cmp.diff["changed"]
     assert jan_cmp.interpretation["schema_version"] == "tone-comparison-1.0"
-    assert (jan_cmp.model, jan_cmp.prompt_version) == ("fake-model-1", "tone-comparison-v1")
+    assert (jan_cmp.model, jan_cmp.prompt_version) == (
+        "fake-model-1",
+        "tone-comparison-v2+fed-fomc-statement-v1",
+    )
 
     mar_cmp = h.comparisons.latest_for_document(mar.id)
     assert "no_language_change" in mar_cmp.uncertainty_flags

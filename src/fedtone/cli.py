@@ -44,6 +44,7 @@ from fedtone.application.review import ReviewService
 from fedtone.application.scheduler import PipelineScheduler
 from fedtone.application.sources import UnsupportedSourceError
 from fedtone.application.tone_analysis import AnalysisService, ToneAnalyzer
+from fedtone.application.tone_profiles import profile_for, profiled_version
 from fedtone.domain.metrics import WindowSpec
 from fedtone.domain.models import RunStatus, RunTrigger
 from fedtone.infrastructure.factories import (
@@ -167,7 +168,10 @@ def _benchmark(args: argparse.Namespace, settings: Settings) -> int:
         ToneAnalyzer(client, temperature=settings.llm.temperature),
         load_dataset(Path(args.dataset)),
         model=client.model,
-        prompt_version=STATEMENT_PROMPT_VERSION,
+        # The benchmark scores FOMC statements, so it runs with the FOMC profile.
+        prompt_version=profiled_version(
+            STATEMENT_PROMPT_VERSION, profile_for("FED", "fomc_statement")
+        ),
         repeats=args.repeats,
     )
     output = Path(args.output)

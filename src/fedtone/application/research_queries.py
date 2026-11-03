@@ -21,6 +21,7 @@ from fedtone.application.ports import (
     ToneAnalysisRepository,
 )
 from fedtone.application.research_summary import metric_display
+from fedtone.application.tone_profiles import profile_id_of
 from fedtone.domain.lifecycle import DocumentStatus
 from fedtone.domain.metrics import EventMetric, WindowSpec
 from fedtone.domain.models import (
@@ -140,6 +141,7 @@ def signal_record(row: DocumentRow) -> dict[str, object]:
             "analysis_id": str(analysis.id) if analysis else None,
             "model": analysis.model if analysis else None,
             "prompt_version": analysis.prompt_version if analysis else None,
+            "tone_profile": profile_id_of(analysis.prompt_version) if analysis else None,
             "schema_version": analysis.schema_version if analysis else None,
             "analyzed_at": analysis.created_at.isoformat() if analysis else None,
             "content_hash": document.content_hash,

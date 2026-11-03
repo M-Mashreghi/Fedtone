@@ -24,6 +24,27 @@ BACKTEST_NOTE = (
 )
 
 
+CROSS_PROFILE_NOTE = (
+    "This view mixes {count} tone profiles ({names}). Every bank is scored on the same -1..+1 "
+    "scale, but levels are calibrated within each bank and document type: compare direction "
+    "and changes across banks, not score levels. Filter by central bank for one series."
+)
+
+
+def cross_profile_note(points: list[dict[str, Any]]) -> str | None:
+    """Warning text when the points come from more than one bank/document-type profile."""
+    profiles = sorted(
+        {
+            p.get("tone_profile") or f"{p['central_bank']}/{p['document_type']}"
+            for p in points
+            if p.get("net_tone_score") is not None
+        }
+    )
+    if len(profiles) < 2:
+        return None
+    return CROSS_PROFILE_NOTE.format(count=len(profiles), names=", ".join(profiles))
+
+
 def series_key(dimension: str) -> str:
     return OVERALL if dimension == "overall" else f"dim_{dimension}"
 
@@ -52,24 +73,28 @@ def timeline_figure(points: list[dict[str, Any]], dimension: str = "overall") ->
     """
     key = series_key(dimension)
     dated = [p for p in points if p.get("published_at")]
-    x = [p["published_at"] for p in dated]
+    # One line per bank/document type: scores of different profiles are never joined.
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for p in dated:
+        groups.setdefault(f"{p['central_bank']} {p['document_type']}", []).append(p)
     figure = go.Figure()
-    figure.add_trace(
-        go.Scatter(
-            x=x,
-            y=[p.get(key) for p in dated],
-            mode="lines+markers",
-            name="score",
-            customdata=[p["document_id"] for p in dated],
-            text=[
-                f"confidence {p['confidence']:.2f}" if p.get("confidence") is not None else ""
-                for p in dated
-            ],
-            hovertemplate="%{x|%Y-%m-%d}<br>score %{y:+.2f}<br>%{text}<extra></extra>",
-            line={"color": SCORE_COLOR},
-            connectgaps=False,
+    for index, (name, group) in enumerate(groups.items()):
+        figure.add_trace(
+            go.Scatter(
+                x=[p["published_at"] for p in group],
+                y=[p.get(key) for p in group],
+                mode="lines+markers",
+                name="score" if len(groups) == 1 else name,
+                customdata=[p["document_id"] for p in group],
+                text=[
+                    f"confidence {p['confidence']:.2f}" if p.get("confidence") is not None else ""
+                    for p in group
+                ],
+                hovertemplate="%{x|%Y-%m-%d}<br>score %{y:+.2f}<br>%{text}<extra></extra>",
+                line={"color": SCORE_COLOR} if index == 0 else {},
+                connectgaps=False,
+            )
         )
-    )
     for state, color, symbol, label in (
         ("needs_review", REVIEW_COLOR, "x", "needs review"),
         ("missing", MISSING_COLOR, "circle-open", "no score"),

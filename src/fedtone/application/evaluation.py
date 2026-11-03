@@ -209,9 +209,10 @@ def run_benchmark(
 
 
 def _as_document(statement: LabeledStatement, now: datetime) -> tuple[PolicyDocument, DocumentText]:
+    # Labeled FOMC statements, scored with the FOMC tone profile.
     document = PolicyDocument(
-        central_bank="BENCHMARK",
-        document_type="labeled_statement",
+        central_bank="FED",
+        document_type="fomc_statement",
         source_url=f"benchmark://{statement.id}",
         discovered_at=now,
     )

@@ -36,6 +36,7 @@ from fedtone.application.prompts import (
     statement_request,
     suspicious_instructions,
 )
+from fedtone.application.tone_profiles import ToneProfile, profile_for, profiled_version
 from fedtone.domain.diff import StatementDiff, diff_statements, tone_delta
 from fedtone.domain.evidence import validate_comparison_evidence, validate_tone_evidence
 from fedtone.domain.lifecycle import DocumentStatus
@@ -100,11 +101,13 @@ class ToneAnalyzer:
     def analyze(
         self, document: PolicyDocument, text: DocumentText, *, now: datetime
     ) -> ToneAnalysis | Rejection:
+        profile = profile_for(document.central_bank, document.document_type)
         request = statement_request(
             title=text.title,
             published_at=text.published_at,
             paragraphs=text.paragraphs,
             temperature=self._temperature,
+            profile=profile,
         )
         problems: list[str] = []
         content = None
@@ -127,7 +130,7 @@ class ToneAnalyzer:
                 document_id=document.id,
                 document_hash=text.text_hash,
                 model=response.model,
-                prompt_version=STATEMENT_PROMPT_VERSION,
+                prompt_version=profiled_version(STATEMENT_PROMPT_VERSION, profile),
                 schema_version=TONE_SCHEMA_VERSION,
                 net_tone_score=output.overall_score,
                 classification=output.label,
@@ -147,6 +150,7 @@ class ToneAnalyzer:
 
     def interpret(
         self,
+        profile: ToneProfile,
         current: DocumentText,
         previous: DocumentText,
         diff: StatementDiff,
@@ -161,6 +165,7 @@ class ToneAnalyzer:
             previous_paragraphs=previous.paragraphs,
             diff=diff,
             temperature=self._temperature,
+            profile=profile,
         )
         problems: list[str] = []
         content = None
@@ -360,10 +365,11 @@ class AnalysisService:
             delta = tone_delta(current.net_tone_score, None, current.dimension_scores, None)
 
         diff = diff_statements(previous_text.paragraphs, current_text.paragraphs)
+        profile = profile_for(document.central_bank, document.document_type)
         interpretation = model = None
         if diff.has_changes:
             try:
-                result = self._analyzer.interpret(current_text, previous_text, diff)
+                result = self._analyzer.interpret(profile, current_text, previous_text, diff)
             except LLMTransientError as exc:
                 transition(
                     document,
@@ -394,7 +400,9 @@ class AnalysisService:
             dimension_deltas=delta.dimensions,
             interpretation=interpretation,
             model=model,
-            prompt_version=COMPARISON_PROMPT_VERSION if interpretation else None,
+            prompt_version=profiled_version(COMPARISON_PROMPT_VERSION, profile)
+            if interpretation
+            else None,
             schema_version=COMPARISON_SCHEMA_VERSION if interpretation else None,
             uncertainty_flags=tuple(flags),
         )
