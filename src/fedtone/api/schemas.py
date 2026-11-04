@@ -11,6 +11,7 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from fedtone.application.analogue_search import AnalogueReport
+from fedtone.application.historical_search import GroundedAnswer
 from fedtone.application.pipeline import PipelineResult
 from fedtone.application.research_queries import (
     DocumentDetail,
@@ -21,6 +22,7 @@ from fedtone.application.research_queries import (
 )
 from fedtone.application.tone_profiles import ToneProfile
 from fedtone.domain.agent_notes import AgentNote
+from fedtone.domain.alerts import Alert
 from fedtone.domain.models import (
     DocumentComparison,
     ProcessingRun,
@@ -543,6 +545,80 @@ class AgentNoteOut(BaseModel):
 class AgentRunOut(BaseModel):
     outcome: str
     note: AgentNoteOut | None
+
+
+class PassageOut(BaseModel):
+    passage_id: str
+    document_id: UUID
+    paragraph_index: int
+    text: str
+    score: float
+    central_bank: str
+    document_type: str
+    speaker: str | None
+    title: str
+    published_at: datetime | None
+    source_url: str
+    net_tone_score: float | None
+    classification: str | None
+    prompt_version: str | None
+
+
+class AskIn(BaseModel):
+    question: str
+    as_of: datetime | None = None
+    limit: int = 5
+
+
+class CitationOut(BaseModel):
+    passage_id: str
+    quote: str
+
+
+class AnswerOut(BaseModel):
+    question: str
+    answer: str | None
+    refused: bool
+    citations: list[CitationOut]
+    passages: list[PassageOut]
+    problems: list[str]
+    model: str | None
+    prompt_version: str
+
+    @classmethod
+    def of(cls, result: GroundedAnswer) -> "AnswerOut":
+        return cls(
+            question=result.question,
+            answer=result.answer,
+            refused=result.answer is None,
+            citations=[
+                CitationOut(passage_id=c.passage_id, quote=c.quote) for c in result.citations
+            ],
+            passages=[PassageOut.model_validate(p, from_attributes=True) for p in result.passages],
+            problems=result.problems,
+            model=result.model,
+            prompt_version=result.prompt_version,
+        )
+
+
+class AlertOut(BaseModel):
+    id: UUID
+    document_id: UUID
+    rule: str
+    message: str
+    values: dict[str, Any]
+    created_at: datetime
+
+    @classmethod
+    def of(cls, alert: Alert) -> "AlertOut":
+        return cls(
+            id=alert.id,
+            document_id=alert.document_id,
+            rule=alert.rule.value,
+            message=alert.message,
+            values=alert.values,
+            created_at=alert.created_at,
+        )
 
 
 class ResolveIn(BaseModel):

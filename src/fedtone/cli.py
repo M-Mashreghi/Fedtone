@@ -12,6 +12,9 @@
     fedtone summarize                   # LLM research summary over computed facts
     fedtone publish                     # publish summarized, market-linked documents
     fedtone agent-notes                 # agentic research notes behind an evidence gate
+    fedtone alerts                      # evaluate and list material tone-change alerts
+    fedtone search "QUERY" [--as-of]    # cited historical passages
+    fedtone intraday DOC --symbol S     # optional intraday window reaction
     fedtone schedule [--once]           # recurring ingest → … → publish cycles
     fedtone backup [--verify FILE]      # verified SQLite snapshot with retention
     fedtone restore FILE --yes          # replace the database with a verified backup
@@ -26,7 +29,7 @@ import signal
 import sys
 import threading
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
 
@@ -34,10 +37,11 @@ import httpx
 
 from fedtone.application.analogue_search import AnalogueService
 from fedtone.application.evaluation import load_dataset, run_benchmark
+from fedtone.application.historical_search import HistoricalSearchService
 from fedtone.application.ingestion import IngestionService
 from fedtone.application.llm import LLMPermanentError
 from fedtone.application.market_reaction import MarketReactionService
-from fedtone.application.pipeline import PipelineService
+from fedtone.application.pipeline import PipelineService, PipelineStage
 from fedtone.application.prompts import STATEMENT_PROMPT_VERSION
 from fedtone.application.publication import PublicationService
 from fedtone.application.research_summary import ResearchSummaryService, metric_display
@@ -46,6 +50,8 @@ from fedtone.application.scheduler import PipelineScheduler
 from fedtone.application.sources import UnsupportedSourceError
 from fedtone.application.tone_analysis import AnalysisService, ToneAnalyzer
 from fedtone.application.tone_profiles import profile_for, profiled_version
+from fedtone.domain.intraday import intraday_reaction
+from fedtone.domain.market import PermanentMarketDataError
 from fedtone.domain.metrics import WindowSpec
 from fedtone.domain.models import RunStatus, RunTrigger
 from fedtone.infrastructure.factories import (
@@ -54,6 +60,7 @@ from fedtone.infrastructure.factories import (
     build_market_provider,
     build_registry,
 )
+from fedtone.infrastructure.market.intraday import IntradayCsvProvider
 from fedtone.infrastructure.persistence.backup import (
     BackupError,
     backup_database,
@@ -62,6 +69,7 @@ from fedtone.infrastructure.persistence.backup import (
 )
 from fedtone.infrastructure.persistence.db import create_db_engine, create_session_factory
 from fedtone.infrastructure.persistence.repositories import (
+    SqlAlchemyAlertRepository,
     SqlAlchemyComparisonRepository,
     SqlAlchemyEventMetricRepository,
     SqlAlchemyMarketObservationRepository,
@@ -310,6 +318,86 @@ def _agent_notes(args: argparse.Namespace, settings: Settings) -> int:
     return 0
 
 
+def _alerts(args: argparse.Namespace, settings: Settings) -> int:
+    session_factory = create_session_factory(create_db_engine(settings.database.url))
+    result = PipelineService(default_stage_runners(settings, session_factory)).run(
+        PipelineStage.ALERTS, args.bank, args.type
+    )
+    print(", ".join(f"{name}={value}" for name, value in result.outcomes.items()))
+    for alert in SqlAlchemyAlertRepository(session_factory).list(limit=20):
+        print(
+            f"{alert.created_at:%Y-%m-%d %H:%M} {alert.document_id} [{alert.rule}] {alert.message}"
+        )
+    return 0
+
+
+def _search(args: argparse.Namespace, settings: Settings) -> int:
+    as_of = datetime.fromisoformat(args.as_of) if args.as_of else None
+    session_factory = create_session_factory(create_db_engine(settings.database.url))
+    service = HistoricalSearchService(
+        documents=SqlAlchemyPolicyDocumentRepository(session_factory),
+        snapshots=SqlAlchemySourceSnapshotRepository(session_factory),
+        analyses=SqlAlchemyToneAnalysisRepository(session_factory),
+    )
+    try:
+        passages = service.search(args.query, as_of=as_of, limit=args.limit)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    for p in passages:
+        released = f"{p.published_at:%Y-%m-%d}" if p.published_at else "?"
+        tone = "-" if p.net_tone_score is None else f"{p.net_tone_score:+.2f}"
+        who = f" {p.speaker}" if p.speaker else ""
+        print(f"[{p.passage_id}] {p.central_bank} {p.document_type}{who} {released} tone={tone}")
+        print(f"    {p.text}")
+    print(f"{len(passages)} passage(s)")
+    return 0
+
+
+def _intraday(args: argparse.Namespace, settings: Settings) -> int:
+    directory = settings.market_data.intraday_directory
+    if not directory:
+        print(
+            "error: intraday data is off (set FEDTONE_MARKET_DATA__INTRADAY_DIRECTORY)",
+            file=sys.stderr,
+        )
+        return 2
+    as_of = datetime.fromisoformat(args.as_of) if args.as_of else datetime.now(UTC)
+    if as_of.utcoffset() is None:
+        print("error: --as-of needs a timezone", file=sys.stderr)
+        return 2
+    instruments = {i.symbol: i for i in build_instruments(settings)}
+    if args.symbol not in instruments:
+        print(f"error: {args.symbol} is not a configured instrument", file=sys.stderr)
+        return 2
+    session_factory = create_session_factory(create_db_engine(settings.database.url))
+    document = SqlAlchemyPolicyDocumentRepository(session_factory).get(UUID(args.document_id))
+    if document is None or document.published_at is None:
+        print("error: document not found or without release time", file=sys.stderr)
+        return 2
+    try:
+        observations = IntradayCsvProvider(Path(directory)).fetch(args.symbol)
+    except PermanentMarketDataError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    reaction = intraday_reaction(
+        observations,
+        symbol=args.symbol,
+        kind=instruments[args.symbol].kind,
+        event_at=document.published_at,
+        minutes_before=args.before,
+        minutes_after=args.after,
+        as_of=as_of,
+    )
+    if reaction.value is None:
+        print(f"{args.symbol} {reaction.window}: not available ({reaction.missing_reason})")
+    elif reaction.unit.value == "bps":
+        print(f"{args.symbol} {reaction.window}: {reaction.value:+.1f} bps")
+    else:
+        print(f"{args.symbol} {reaction.window}: {reaction.value * 100:+.2f}%")
+    return 0
+
+
 def _publish(args: argparse.Namespace, settings: Settings) -> int:
     session_factory = create_session_factory(create_db_engine(settings.database.url))
     report = PublicationService(
@@ -447,6 +535,7 @@ def build_parser() -> argparse.ArgumentParser:
         ("summarize", _summarize, "LLM research summaries for market-linked documents"),
         ("publish", _publish, "publish summarized, market-linked documents"),
         ("agent-notes", _agent_notes, "agentic research notes (evidence-gated)"),
+        ("alerts", _alerts, "evaluate and list material tone-change alerts"),
         ("schedule", _schedule, "run pipeline cycles every scheduler interval"),
     ):
         sub = commands.add_parser(name, help=text)
@@ -459,6 +548,20 @@ def build_parser() -> argparse.ArgumentParser:
             sub.add_argument("--once", action="store_true", help="run one cycle and exit")
             # Default: every source in FEDTONE_SOURCES__ENABLED.
             sub.set_defaults(bank=None, type=None)
+
+    search = commands.add_parser("search", help="cited historical passages")
+    search.add_argument("query")
+    search.add_argument("--as-of", help="only documents public by this ISO time")
+    search.add_argument("--limit", type=int, default=5)
+    search.set_defaults(handler=_search)
+
+    intraday = commands.add_parser("intraday", help="optional intraday window reaction")
+    intraday.add_argument("document_id")
+    intraday.add_argument("--symbol", required=True)
+    intraday.add_argument("--before", type=int, default=15, help="minutes before release")
+    intraday.add_argument("--after", type=int, default=60, help="minutes after release")
+    intraday.add_argument("--as-of", help="only data available at this ISO time")
+    intraday.set_defaults(handler=_intraday)
 
     backup = commands.add_parser("backup", help="verified SQLite snapshot")
     backup.add_argument("--dir", help="backup directory (default FEDTONE_BACKUP__DIRECTORY)")

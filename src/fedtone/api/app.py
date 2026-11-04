@@ -11,6 +11,7 @@ from fedtone import __version__
 from fedtone.api.routes import Services, router
 from fedtone.application.agentic_research import AgentResearchService
 from fedtone.application.analogue_search import AnalogueService
+from fedtone.application.historical_search import HistoricalSearchService
 from fedtone.application.llm import LLMPermanentError
 from fedtone.application.pipeline import (
     PipelineService,
@@ -28,6 +29,7 @@ from fedtone.infrastructure.persistence.db import (
 )
 from fedtone.infrastructure.persistence.repositories import (
     SqlAlchemyAgentNoteRepository,
+    SqlAlchemyAlertRepository,
     SqlAlchemyComparisonRepository,
     SqlAlchemyEventMetricRepository,
     SqlAlchemyPolicyDocumentRepository,
@@ -157,6 +159,14 @@ def _build_services(
             ) from exc
         return agent_service(settings, session_factory, client)
 
+    def answer_client():
+        try:
+            return factories.llm_client(settings)
+        except LLMPermanentError as exc:
+            raise StageUnavailableError(
+                f"{exc} (set FEDTONE_LLM__API_KEY and FEDTONE_LLM__MODEL)"
+            ) from exc
+
     return Services(
         queries=ResearchQueryService(
             documents=documents,
@@ -175,6 +185,13 @@ def _build_services(
         pipeline=PipelineService(stage_runners),
         agent_notes=SqlAlchemyAgentNoteRepository(session_factory),
         agent_research=agent_research,
+        search=HistoricalSearchService(
+            documents=documents,
+            snapshots=SqlAlchemySourceSnapshotRepository(session_factory),
+            analyses=analyses,
+        ),
+        alerts=SqlAlchemyAlertRepository(session_factory),
+        answer_client=answer_client,
         analogue_top_k=settings.market_data.analogue_top_k,
         analogue_min_sample=settings.market_data.analogue_min_sample,
     )

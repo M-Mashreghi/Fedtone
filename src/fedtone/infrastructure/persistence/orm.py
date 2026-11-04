@@ -293,3 +293,18 @@ class AgentNoteRow(Base):
     claims: Mapped[list[dict]] = mapped_column(JSON)
     markdown: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+
+class AlertRow(Base):
+    __tablename__ = "alerts"
+    __table_args__ = (
+        UniqueConstraint("document_id", "rule", name="uq_alerts_document_rule"),
+        Index("ix_alerts_created_at", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    document_id: Mapped[UUID] = mapped_column(ForeignKey("policy_documents.id"))
+    rule: Mapped[str] = mapped_column(String(32))
+    message: Mapped[str] = mapped_column(Text)
+    values: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())

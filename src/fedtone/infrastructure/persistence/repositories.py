@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from fedtone.domain.agent_notes import AgentNote, NoteClaim, Section
+from fedtone.domain.alerts import Alert, AlertRule
 from fedtone.domain.lifecycle import DocumentStatus
 from fedtone.domain.market import MarketSeries, Observation
 from fedtone.domain.metrics import EventMetric, MetricKind, MetricUnit, MissingReason
@@ -29,6 +30,7 @@ from fedtone.domain.models import (
 from fedtone.domain.summary import Fact, ResearchSummary
 from fedtone.infrastructure.persistence.orm import (
     AgentNoteRow,
+    AlertRow,
     DocumentComparisonRow,
     DocumentStatusChangeRow,
     DocumentTextRow,
@@ -794,3 +796,45 @@ class SqlAlchemyAgentNoteRepository:
                 markdown=row.markdown,
                 created_at=row.created_at,
             )
+
+
+def _alert_to_domain(row: AlertRow) -> Alert:
+    return Alert(
+        id=row.id,
+        document_id=row.document_id,
+        rule=AlertRule(row.rule),
+        message=row.message,
+        values=dict(row.values),
+        created_at=row.created_at,
+    )
+
+
+class SqlAlchemyAlertRepository:
+    def __init__(self, session_factory: sessionmaker[Session]) -> None:
+        self._session_factory = session_factory
+
+    def add(self, alert: Alert) -> bool:
+        with self._session_factory() as session:
+            session.add(
+                AlertRow(
+                    id=alert.id,
+                    document_id=alert.document_id,
+                    rule=alert.rule.value,
+                    message=alert.message,
+                    values=alert.values,
+                    created_at=alert.created_at,
+                )
+            )
+            try:
+                session.commit()
+            except IntegrityError:
+                session.rollback()
+                return False
+            return True
+
+    def list(self, *, document_id: UUID | None = None, limit: int = 100) -> Sequence[Alert]:
+        query = select(AlertRow).order_by(AlertRow.created_at.desc(), AlertRow.id).limit(limit)
+        if document_id is not None:
+            query = query.where(AlertRow.document_id == document_id)
+        with self._session_factory() as session:
+            return [_alert_to_domain(row) for row in session.scalars(query).all()]

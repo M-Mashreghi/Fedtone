@@ -14,13 +14,17 @@ from fedtone import __version__
 from fedtone.api.schemas import (
     AgentNoteOut,
     AgentRunOut,
+    AlertOut,
     AnaloguesOut,
     AnalysisOut,
+    AnswerOut,
+    AskIn,
     AuditOut,
     ComparisonOut,
     DocumentDetailOut,
     DocumentPageOut,
     MarketReactionOut,
+    PassageOut,
     PipelineResultOut,
     ResolveIn,
     ReviewOut,
@@ -35,8 +39,10 @@ from fedtone.api.schemas import (
 )
 from fedtone.application.agentic_research import AgentResearchService
 from fedtone.application.analogue_search import AnalogueService
+from fedtone.application.historical_search import HistoricalSearchService, answer_question
+from fedtone.application.llm import LLMClient
 from fedtone.application.pipeline import PipelineService, PipelineStage, StageUnavailableError
-from fedtone.application.ports import AgentNoteRepository
+from fedtone.application.ports import AgentNoteRepository, AlertRepository
 from fedtone.application.prompts import COMPARISON_PROMPT_VERSION, STATEMENT_PROMPT_VERSION
 from fedtone.application.research_export import research_note, signals_to_csv, signals_to_json
 from fedtone.application.research_queries import (
@@ -78,6 +84,10 @@ class Services:
     agent_notes: AgentNoteRepository | None = None
     # Builds the agentic workflow; raises StageUnavailableError without an LLM.
     agent_research: Callable[[], AgentResearchService] | None = None
+    search: HistoricalSearchService | None = None
+    alerts: AlertRepository | None = None
+    # LLM client for grounded answers; raises StageUnavailableError without an LLM.
+    answer_client: Callable[[], LLMClient] | None = None
     analogue_top_k: int = 5
     analogue_min_sample: int = 3
 
@@ -252,6 +262,57 @@ def create_agent_note(document_id: UUID, services: ServicesDep) -> AgentRunOut:
     except StageUnavailableError as exc:
         raise HTTPException(http.HTTP_409_CONFLICT, str(exc)) from exc
     return AgentRunOut(outcome=outcome.value, note=AgentNoteOut.of(note) if note else None)
+
+
+@router.get("/search", response_model=list[PassageOut], tags=["research"])
+def search_history(
+    services: ServicesDep,
+    q: Annotated[str, Query(min_length=2, max_length=300)],
+    as_of: Annotated[datetime | None, Query(description="only documents public by then")] = None,
+    central_bank: str | None = None,
+    document_type: str | None = None,
+    limit: Annotated[int, Query(ge=1, le=50)] = 5,
+) -> list[PassageOut]:
+    """Paragraph-level retrieval over stored documents; each hit is a citable record."""
+    if services.search is None:
+        raise HTTPException(http.HTTP_409_CONFLICT, "search is not configured")
+    try:
+        passages = services.search.search(
+            q, as_of=as_of, central_bank=central_bank, document_type=document_type, limit=limit
+        )
+    except ValueError as exc:
+        raise HTTPException(UNPROCESSABLE, str(exc)) from exc
+    return [PassageOut.model_validate(p, from_attributes=True) for p in passages]
+
+
+@router.post("/ask", response_model=AnswerOut, tags=["research"])
+def ask_history(body: AskIn, services: ServicesDep) -> AnswerOut:
+    """Answer from retrieved passages only; refused (answer null) unless every quote and
+    number is backed by a cited passage."""
+    if services.search is None or services.answer_client is None:
+        raise HTTPException(http.HTTP_409_CONFLICT, "grounded answers are not configured")
+    try:
+        client = services.answer_client()
+        result = answer_question(
+            client, services.search, body.question, as_of=body.as_of, limit=body.limit
+        )
+    except StageUnavailableError as exc:
+        raise HTTPException(http.HTTP_409_CONFLICT, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(UNPROCESSABLE, str(exc)) from exc
+    return AnswerOut.of(result)
+
+
+@router.get("/alerts", response_model=list[AlertOut], tags=["system"])
+def list_alerts(
+    services: ServicesDep,
+    document_id: UUID | None = None,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+) -> list[AlertOut]:
+    """Fired material tone-change alerts, newest first."""
+    if services.alerts is None:
+        return []
+    return [AlertOut.of(a) for a in services.alerts.list(document_id=document_id, limit=limit)]
 
 
 @router.get("/timeline", response_model=TimelineOut, tags=["analysis"])

@@ -9,6 +9,7 @@ from typing import Protocol
 from uuid import UUID
 
 from fedtone.domain.agent_notes import AgentNote
+from fedtone.domain.alerts import Alert
 from fedtone.domain.lifecycle import DocumentStatus
 from fedtone.domain.market import MarketSeries, Observation
 from fedtone.domain.metrics import EventMetric
@@ -161,3 +162,13 @@ class AgentNoteRepository(Protocol):
     def add(self, note: AgentNote) -> None: ...
 
     def latest_for_document(self, document_id: UUID) -> AgentNote | None: ...
+
+
+class AlertRepository(Protocol):
+    def add(self, alert: Alert) -> bool:
+        """Store an alert; False (nothing stored) if this document already fired this rule."""
+        ...
+
+    def list(self, *, document_id: UUID | None = None, limit: int = 100) -> Sequence[Alert]:
+        """Newest first."""
+        ...

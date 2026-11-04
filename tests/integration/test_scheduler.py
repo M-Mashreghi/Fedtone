@@ -110,7 +110,11 @@ def test_unconfigured_stage_is_skipped_and_crash_does_not_stop_cycle() -> None:
     assert [c[0] for c in calls] == [PipelineStage.INGEST, PipelineStage.SUMMARIZE]
     assert {c[1] for c in calls} == {RunTrigger.SCHEDULED}
     assert report.errors == {PipelineStage.ANALYZE: "RuntimeError: boom"}
-    assert set(report.skipped) == {PipelineStage.REACTIONS, PipelineStage.PUBLISH}
+    assert set(report.skipped) == {
+        PipelineStage.ALERTS,
+        PipelineStage.REACTIONS,
+        PipelineStage.PUBLISH,
+    }
     assert not report.healthy
 
 

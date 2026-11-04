@@ -23,6 +23,8 @@ class PipelineStage(StrEnum):
     REACTIONS = "reactions"
     SUMMARIZE = "summarize"
     PUBLISH = "publish"
+    # Material tone-change alerts (Task 7.5).
+    ALERTS = "alerts"
     # Optional: agentic research notes (Task 7.4); not part of the default cycle.
     AGENT_NOTES = "agent_notes"
 
@@ -31,6 +33,7 @@ class PipelineStage(StrEnum):
 CYCLE = (
     PipelineStage.INGEST,
     PipelineStage.ANALYZE,
+    PipelineStage.ALERTS,
     PipelineStage.REACTIONS,
     PipelineStage.SUMMARIZE,
     PipelineStage.PUBLISH,

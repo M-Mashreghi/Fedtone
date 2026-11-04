@@ -133,6 +133,8 @@ class MarketDataSettings(BaseModel):
     benchmark_symbol: str | None = None
     analogue_top_k: int = Field(default=5, ge=1)
     analogue_min_sample: int = Field(default=3, ge=1)
+    # Optional intraday CSV folder (<SYMBOL>.csv with tz-aware timestamps); empty = off.
+    intraday_directory: str | None = None
 
     @field_validator("benchmark_symbol", mode="before")
     @classmethod
@@ -143,6 +145,23 @@ class MarketDataSettings(BaseModel):
 class BackupSettings(BaseModel):
     directory: str = "./data/backups"
     retention_count: int = Field(default=7, ge=1)
+
+
+class AlertSettings(BaseModel):
+    """Material tone-change alerts; leave a threshold empty to disable that rule."""
+
+    enabled: bool = True
+    min_abs_overall_delta: float | None = Field(default=0.3, gt=0, le=2)
+    classification_change: bool = True
+    min_abs_dimension_delta: float | None = Field(default=0.5, gt=0, le=2)
+    min_confidence: float = Field(default=0.6, ge=0, le=1)
+    webhook_url: SecretStr | None = None
+    timeout_seconds: float = Field(default=10.0, gt=0)
+
+    @field_validator("min_abs_overall_delta", "min_abs_dimension_delta", mode="before")
+    @classmethod
+    def _blank_is_none(cls, value: object) -> object:
+        return None if value == "" else value
 
 
 class UISettings(BaseModel):
@@ -169,6 +188,7 @@ class Settings(BaseSettings):
     market_data: MarketDataSettings = MarketDataSettings()
     ui: UISettings = UISettings()
     backup: BackupSettings = BackupSettings()
+    alerts: AlertSettings = AlertSettings()
 
     @model_validator(mode="after")
     def _require_production_secrets(self) -> "Settings":
@@ -185,7 +205,7 @@ class Settings(BaseSettings):
 
     def secret_values(self) -> list[str]:
         """Plain values of all configured secrets, for redaction only."""
-        secrets = (self.llm.api_key, self.market_data.api_key)
+        secrets = (self.llm.api_key, self.market_data.api_key, self.alerts.webhook_url)
         return [s.get_secret_value() for s in secrets if _has_secret(s)]
 
 
