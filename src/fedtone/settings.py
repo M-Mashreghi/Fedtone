@@ -54,6 +54,7 @@ class SourceSettings(BaseModel):
     snb_listing_urls: list[str] = [
         "https://www.snb.ch/en/the-snb/mandates-goals/monetary-policy/decisions"
     ]
+    fed_speech_listing_urls: list[str] = ["https://www.federalreserve.gov/feeds/speeches.xml"]
     # Sources the scheduler cycles over, as "BANK/document_type".
     enabled: list[str] = ["FED/fomc_statement"]
 

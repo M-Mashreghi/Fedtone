@@ -6,7 +6,7 @@ recalculated. The timeline, the signal export and the document list all come fro
 """
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from uuid import UUID
 
@@ -21,7 +21,7 @@ from fedtone.application.ports import (
     ToneAnalysisRepository,
 )
 from fedtone.application.research_summary import metric_display
-from fedtone.application.tone_profiles import profile_id_of
+from fedtone.application.tone_profiles import SPEAKER_DOCUMENT_TYPES, profile_id_of
 from fedtone.domain.lifecycle import DocumentStatus
 from fedtone.domain.metrics import EventMetric, WindowSpec
 from fedtone.domain.models import (
@@ -49,6 +49,9 @@ class DocumentFilter:
     model: str | None = None
     published_from: datetime | None = None
     published_to: datetime | None = None
+    speaker: str | None = None
+    # Speeches are kept out of committee views unless asked for (type or speaker).
+    include_speeches: bool = False
 
     def __post_init__(self) -> None:
         for name in ("published_from", "published_to"):
@@ -57,6 +60,15 @@ class DocumentFilter:
                 raise ValueError(f"{name} must be timezone-aware")
 
     def matches(self, document: PolicyDocument, analysis: ToneAnalysis | None) -> bool:
+        if self.speaker is not None and document.speaker != self.speaker:
+            return False
+        speech_requested = (
+            self.include_speeches
+            or self.speaker is not None
+            or self.document_type in SPEAKER_DOCUMENT_TYPES
+        )
+        if document.document_type in SPEAKER_DOCUMENT_TYPES and not speech_requested:
+            return False
         if self.model is not None and (analysis is None or analysis.model != self.model):
             return False
         if self.published_from is None and self.published_to is None:
@@ -124,6 +136,7 @@ def signal_record(row: DocumentRow) -> dict[str, object]:
         "document_id": str(document.id),
         "central_bank": document.central_bank,
         "document_type": document.document_type,
+        "speaker": document.speaker,
         "published_at": document.published_at.isoformat() if document.published_at else None,
         "status": document.status.value,
         "needs_review": row.needs_review,
@@ -269,6 +282,39 @@ class ResearchQueryService:
 
     def recent_runs(self, *, limit: int = 20) -> Sequence[ProcessingRun]:
         return self._runs.list_recent(limit=limit)
+
+    def speakers(self, filters: DocumentFilter) -> list[dict[str, object]]:
+        """Per speaker: speech count, first/last date, stored scores and their mean.
+
+        The mean is a plain average of stored scores (deterministic), within one bank and
+        tone profile; speakers are never mixed with committee documents.
+        """
+        speech_filter = replace(filters, include_speeches=True)
+        groups: dict[tuple[str, str], list[DocumentRow]] = {}
+        for row in self.rows(speech_filter):
+            document = row.document
+            if document.speaker is None or document.document_type not in SPEAKER_DOCUMENT_TYPES:
+                continue
+            groups.setdefault((document.central_bank, document.speaker), []).append(row)
+        result = []
+        for (bank, speaker), rows in sorted(groups.items()):
+            scores = [r.analysis.net_tone_score for r in rows if r.analysis is not None]
+            dated = [r.document.published_at for r in rows if r.document.published_at]
+            latest = rows[-1]
+            result.append(
+                {
+                    "central_bank": bank,
+                    "speaker": speaker,
+                    "speeches": len(rows),
+                    "scored": len(scores),
+                    "first_at": min(dated).isoformat() if dated else None,
+                    "last_at": max(dated).isoformat() if dated else None,
+                    "mean_tone": sum(scores) / len(scores) if scores else None,
+                    "latest_tone": latest.analysis.net_tone_score if latest.analysis else None,
+                    "latest_document_id": str(latest.document.id),
+                }
+            )
+        return result
 
     def telemetry(self) -> SystemTelemetry:
         counts = dict.fromkeys((s.value for s in DocumentStatus), 0)

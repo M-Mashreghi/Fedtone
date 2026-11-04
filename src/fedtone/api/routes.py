@@ -24,6 +24,7 @@ from fedtone.api.schemas import (
     ReviewOut,
     RunOut,
     SignalRecord,
+    SpeakerOut,
     TelemetryOut,
     TimelineOut,
     ToneProfileOut,
@@ -89,6 +90,11 @@ def document_filter(
     model: str | None = None,
     published_from: Annotated[datetime | None, Query(description="ISO time with timezone")] = None,
     published_to: Annotated[datetime | None, Query(description="ISO time with timezone")] = None,
+    speaker: str | None = None,
+    include_speeches: Annotated[
+        bool,
+        Query(description="speeches are excluded unless requested, by type, speaker or this flag"),
+    ] = False,
 ) -> DocumentFilter:
     try:
         return DocumentFilter(
@@ -98,6 +104,8 @@ def document_filter(
             model=model,
             published_from=published_from,
             published_to=published_to,
+            speaker=speaker,
+            include_speeches=include_speeches,
         )
     except ValueError as exc:
         raise HTTPException(UNPROCESSABLE, str(exc)) from exc
@@ -288,6 +296,12 @@ def resolve_review(item_id: UUID, body: ResolveIn, services: ServicesDep) -> Rev
     except ValueError as exc:
         raise HTTPException(http.HTTP_409_CONFLICT, str(exc)) from exc
     return ReviewOut.of(item)
+
+
+@router.get("/speakers", response_model=list[SpeakerOut], tags=["analysis"])
+def list_speakers(services: ServicesDep, filters: FilterDep) -> list[SpeakerOut]:
+    """Speaker-level tone history summary; use ``/timeline?speaker=...`` for the series."""
+    return [SpeakerOut.model_validate(item) for item in services.queries.speakers(filters)]
 
 
 @router.get("/system/tone-profiles", response_model=list[ToneProfileOut], tags=["system"])

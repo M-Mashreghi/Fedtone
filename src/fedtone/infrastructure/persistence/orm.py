@@ -69,6 +69,7 @@ class PolicyDocumentRow(Base):
             "published_at",
         ),
         Index("ix_policy_documents_status", "status"),
+        Index("ix_policy_documents_speaker", "speaker"),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True)
@@ -81,6 +82,7 @@ class PolicyDocumentRow(Base):
     content_hash: Mapped[str | None] = mapped_column(String(64))
     parser_version: Mapped[str | None] = mapped_column(String(64))
     previous_document_id: Mapped[UUID | None] = mapped_column(ForeignKey("policy_documents.id"))
+    speaker: Mapped[str | None] = mapped_column(String(128))
     status: Mapped[str] = mapped_column(String(32))
     last_successful_status: Mapped[str] = mapped_column(String(32))
     # No FK: tone_analyses already references policy_documents, and a cycle would need ALTER

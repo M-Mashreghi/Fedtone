@@ -39,6 +39,12 @@ def _filters_sidebar(points: list[dict[str, Any]]) -> dict[str, Any]:
         "model": st.sidebar.selectbox("Model version", ["(all)", *models]),
         "status": st.sidebar.selectbox("Status", ["(all)", *(s.value for s in DocumentStatus)]),
     }
+    speakers = sorted({p["speaker"] for p in points if p.get("speaker")})
+    if speakers:
+        # Speeches stay out of committee views unless chosen here (or as document type).
+        filters["speaker"] = st.sidebar.selectbox("Speaker (speeches)", ["(none)", *speakers])
+        if filters["speaker"] == "(none)":
+            del filters["speaker"]
     dates = [p["published_at"][:10] for p in points if p["published_at"]]
     if dates:
         first, last = date.fromisoformat(min(dates)), date.fromisoformat(max(dates))
@@ -190,7 +196,7 @@ def main() -> None:
     st.title("FedTone - policy tone research")
     client = get_client()
     try:
-        everything = client.timeline()["points"]
+        everything = client.timeline(include_speeches=True)["points"]
         filters = _filters_sidebar(everything)
         points = client.timeline(**filters)["points"]
     except ApiError as exc:

@@ -51,6 +51,7 @@ class ParsedDocument:
     published_at: datetime | None
     paragraphs: tuple[str, ...]
     parser_version: str
+    speaker: str | None = None
 
 
 @runtime_checkable

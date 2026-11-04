@@ -123,6 +123,8 @@ class PolicyDocument:
     content_hash: str | None = None
     parser_version: str | None = None
     previous_document_id: UUID | None = None
+    # Person who gave a speech; None for committee documents (statements, minutes).
+    speaker: str | None = None
     id: UUID = field(default_factory=uuid4)
     status: DocumentStatus = DocumentStatus.DISCOVERED
     last_successful_status: DocumentStatus = DocumentStatus.DISCOVERED

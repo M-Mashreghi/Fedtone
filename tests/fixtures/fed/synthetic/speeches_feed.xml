@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SYNTHETIC TEST FIXTURE: modeled on the federalreserve.gov speeches RSS feed. -->
+<rss version="2.0"><channel>
+  <title>Speeches</title>
+  <item><title><![CDATA[Barr, Progress on Synthetic Inflation]]></title><link><![CDATA[https://www.federalreserve.gov/newsevents/speech/barr20240610a.htm]]></link></item>
+  <item><title><![CDATA[Cook, Synthetic Housing]]></title><link><![CDATA[https://www.federalreserve.gov/newsevents/speech/cook20240401a.htm]]></link></item>
+  <item><title><![CDATA[Barr, The Synthetic Outlook]]></title><link><![CDATA[https://www.federalreserve.gov/newsevents/speech/barr20240305a.htm]]></link></item>
+  <item><title>Testimony</title><link>https://www.federalreserve.gov/newsevents/testimony/powell20240306a.htm</link></item>
+</channel></rss>

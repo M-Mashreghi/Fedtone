@@ -8,12 +8,15 @@ from datetime import date
 import pytest
 
 from fedtone.domain.text import normalize_paragraphs
-from fedtone.infrastructure.sources import boe, ecb, snb
+from fedtone.infrastructure.sources import boe, ecb, fed_speeches, fomc_minutes, snb
 from tests.bank_fixtures import FIXTURES
 
 ECB_FILES = sorted((FIXTURES / "ecb" / "live").glob("decision_*.html"))
 BOE_FILES = sorted((FIXTURES / "boe" / "live").glob("summary_*.html"))
 SNB_FILES = sorted((FIXTURES / "snb" / "live").glob("assessment_*.pdf"))
+SPEECH_FILES = sorted((FIXTURES / "fed" / "live").glob("speech_*.htm"))
+MINUTES_FILES = sorted((FIXTURES / "fed" / "live").glob("minutes_*.htm"))
+FED = "https://www.federalreserve.gov"
 
 
 def _day(path, prefix: str) -> date:
@@ -68,3 +71,42 @@ def test_live_snb_assessment_parses(path) -> None:
     assert "inflation" in text and "snb" in text
     for boilerplate in ("page 1/", "p.o. box", "more detailed information"):
         assert boilerplate not in text
+
+
+@pytest.mark.skipif(not SPEECH_FILES, reason="no captured Fed speeches")
+@pytest.mark.parametrize("path", SPEECH_FILES, ids=lambda p: p.name)
+def test_live_fed_speech_parses(path) -> None:
+    url = f"{FED}/newsevents/speech/{path.name.removeprefix('speech_')}"
+
+    parsed = fed_speeches.parse_speech_html(path.read_text(encoding="utf-8"), url)
+
+    assert parsed.speaker and not parsed.speaker.lower().startswith(("governor", "chair"))
+    assert parsed.published_at.date() >= fed_speeches.speech_date_from_url(url)
+    assert len(parsed.paragraphs) >= 3
+    assert not any("Return to text" in p for p in parsed.paragraphs)
+
+
+@pytest.mark.skipif(not MINUTES_FILES, reason="no captured FOMC minutes")
+@pytest.mark.parametrize("path", MINUTES_FILES, ids=lambda p: p.name)
+def test_live_fomc_minutes_parse(path) -> None:
+    url = f"{FED}/monetarypolicy/fomcminutes{path.stem.removeprefix('minutes_')}.htm"
+
+    parsed = fomc_minutes.parse_minutes_html(path.read_text(encoding="utf-8"), url)
+
+    text = " ".join(parsed.paragraphs).lower()
+    assert len(parsed.paragraphs) >= 20
+    assert "participants" in text and "federal funds rate" in text
+    assert not text.startswith("attendance") and "return to text" not in text
+
+
+@pytest.mark.skipif(not BOE_FILES, reason="no captured BoE pages")
+@pytest.mark.parametrize("path", BOE_FILES, ids=lambda p: p.name)
+def test_live_boe_minutes_parse(path) -> None:
+    month = _day(path, "summary_")
+    url = f"{boe.BASE_URL}/monetary-policy-summary-and-minutes/{month:%Y}/{month:%B}-{month:%Y}"
+
+    parsed = boe.parse_minutes_html(path.read_text(encoding="utf-8"), url.lower())
+
+    text = " ".join(parsed.paragraphs).lower()
+    assert len(parsed.paragraphs) >= 20
+    assert "were present" not in text

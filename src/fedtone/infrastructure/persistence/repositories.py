@@ -50,6 +50,7 @@ _DOCUMENT_FIELDS = (
     "content_hash",
     "parser_version",
     "previous_document_id",
+    "speaker",
     "published_analysis_id",
     "failure_reason",
 )

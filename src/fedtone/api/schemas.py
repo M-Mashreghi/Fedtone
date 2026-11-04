@@ -33,6 +33,7 @@ class SignalRecord(BaseModel):
     document_id: UUID
     central_bank: str
     document_type: str
+    speaker: str | None
     published_at: datetime | None
     status: str
     needs_review: bool
@@ -55,6 +56,18 @@ class SignalRecord(BaseModel):
     analyzed_at: datetime | None
     content_hash: str | None
     source_url: str
+
+
+class SpeakerOut(BaseModel):
+    central_bank: str
+    speaker: str
+    speeches: int
+    scored: int
+    first_at: datetime | None
+    last_at: datetime | None
+    mean_tone: float | None
+    latest_tone: float | None
+    latest_document_id: UUID
 
 
 class DocumentPageOut(BaseModel):

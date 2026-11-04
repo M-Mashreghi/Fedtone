@@ -1,8 +1,8 @@
-"""Save official ECB, Bank of England and SNB pages as test fixtures.
+"""Save official ECB, Bank of England, SNB and Fed speech/minutes pages as test fixtures.
 
 Run from the project root on a machine that can reach the official sites:
 
-    python scripts/capture_bank_fixtures.py            # all three banks
+    python scripts/capture_bank_fixtures.py            # all sources
     python scripts/capture_bank_fixtures.py ecb snb    # selected banks
 
 Files are saved byte-for-byte under tests/fixtures/<bank>/live/ and are then exercised by
@@ -15,7 +15,7 @@ from pathlib import Path
 
 import httpx
 
-from fedtone.infrastructure.sources import boe, ecb, snb
+from fedtone.infrastructure.sources import boe, ecb, fed_speeches, fomc_minutes, snb
 
 ROOT = Path(__file__).resolve().parents[1] / "tests" / "fixtures"
 USER_AGENT = "FedTone research fixture capture"
@@ -49,6 +49,17 @@ def capture_snb(client: httpx.Client, out: Path) -> None:
         _save(client, pdf_url, out / f"assessment_{day:%Y%m%d}.pdf")
 
 
+def capture_fed(client: httpx.Client, out: Path) -> None:
+    feed = client.get(fed_speeches.DEFAULT_LISTING_URLS[0])
+    for url in fed_speeches.discover_speech_links(feed.text, str(feed.url))[:MAX_DOCUMENTS]:
+        _save(client, url, out / f"speech_{url.rsplit('/', 1)[1]}")
+    calendar = client.get(fomc_minutes.DEFAULT_LISTING_URLS[0])
+    links = fomc_minutes.discover_minutes_links(calendar.text, str(calendar.url))
+    for url in sorted(links, key=fomc_minutes.meeting_date_from_url)[-MAX_DOCUMENTS - 1 : -1]:
+        day = fomc_minutes.meeting_date_from_url(url)
+        _save(client, url, out / f"minutes_{day:%Y%m%d}.htm")
+
+
 def _save(client: httpx.Client, url: str, path: Path) -> None:
     response = client.get(url)
     if response.status_code != 200:
@@ -58,7 +69,7 @@ def _save(client: httpx.Client, url: str, path: Path) -> None:
     print(f"saved {path.relative_to(ROOT)} ({len(response.content)} bytes) from {url}")
 
 
-CAPTURES = {"ecb": capture_ecb, "boe": capture_boe, "snb": capture_snb}
+CAPTURES = {"ecb": capture_ecb, "boe": capture_boe, "snb": capture_snb, "fed": capture_fed}
 
 
 def main(banks: list[str]) -> int:

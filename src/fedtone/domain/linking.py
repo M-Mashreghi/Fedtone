@@ -1,8 +1,10 @@
 """Previous-comparable-document linking.
 
-A document's previous comparable document is the latest document of the same central bank
-and document type published strictly before it. Only documents with a known publication time
-take part, so the link never depends on information published later (no look-ahead).
+A document's previous comparable document is the latest document of the same central bank,
+document type and speaker (None for committee documents) published strictly before it, so a
+speech is compared with the same person's previous speech. Only documents with a known
+publication time take part, so the link never depends on information published later
+(no look-ahead).
 """
 
 from collections.abc import Iterable
@@ -13,10 +15,11 @@ from fedtone.domain.models import PolicyDocument
 
 def previous_comparable_links(documents: Iterable[PolicyDocument]) -> dict[UUID, UUID | None]:
     """Map each dated document id to its previous comparable document id (None = baseline)."""
-    groups: dict[tuple[str, str], list[PolicyDocument]] = {}
+    groups: dict[tuple[str, str, str | None], list[PolicyDocument]] = {}
     for doc in documents:
         if doc.published_at is not None:
-            groups.setdefault((doc.central_bank, doc.document_type), []).append(doc)
+            key = (doc.central_bank, doc.document_type, doc.speaker)
+            groups.setdefault(key, []).append(doc)
 
     links: dict[UUID, UUID | None] = {}
     for group in groups.values():

@@ -144,7 +144,10 @@ def test_boe_discovery_reads_rss_links() -> None:
 @pytest.mark.parametrize(
     ("mutate", "message"),
     [
-        (lambda h: h.replace("Monetary Policy Summary, August", "Summary, August"), "no Monetary"),
+        (
+            lambda h: h.replace("Monetary Policy Summary, August", "Summary, August"),
+            "monetary policy summary. section",
+        ),
         (lambda h: h.replace("01 August 2024", "01 July 2024"), "URL month"),
         (lambda h: h.replace('class="published-date"', 'class="date"'), "published date"),
     ],

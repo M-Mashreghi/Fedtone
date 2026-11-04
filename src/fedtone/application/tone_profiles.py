@@ -135,6 +135,82 @@ PROFILES: dict[tuple[str, str], ToneProfile] = {
     ),
 }
 
+# Speeches and minutes (Task 7.3). Their scores form separate baselines from statements.
+PROFILES.update(
+    {
+        ("FED", "speech"): ToneProfile(
+            id="fed-speech-v1",
+            institution="a member of the Federal Reserve Board or a Reserve Bank president",
+            document="public speech by one policymaker (individual view, not a Committee decision)",
+            policy_instrument="federal funds rate path and balance sheet, as viewed by the speaker",
+            mandate="dual mandate of maximum employment and price stability (2% PCE inflation)",
+            dimension_guidance=(
+                ("inflation", "the speaker's view of inflation and inflation risks"),
+                ("labor", "the speaker's view of the labor market"),
+                ("growth", "the speaker's view of activity and the outlook"),
+                (
+                    "policy_guidance",
+                    "the speaker's preferred policy path; use null if the "
+                    "speech does not discuss monetary policy",
+                ),
+                ("balance_sheet", "the speaker's view on balance-sheet policy"),
+            ),
+            notes=(
+                "Many speeches cover regulation, payments or community topics. If the speech "
+                "says little about monetary policy, keep scores near 0, lower confidence and "
+                "add an uncertainty flag.",
+                "Score the speaker's own stance, not the Committee's last decision.",
+            ),
+        ),
+        ("FED", "fomc_minutes"): ToneProfile(
+            id="fed-fomc-minutes-v1",
+            institution="Federal Open Market Committee of the U.S. Federal Reserve",
+            document="minutes of an FOMC meeting, published three weeks after the decision",
+            policy_instrument="target range for the federal funds rate; balance-sheet runoff",
+            mandate="dual mandate of maximum employment and price stability (2% PCE inflation)",
+            dimension_guidance=(
+                ("inflation", "participants' assessment of inflation and its risks"),
+                ("labor", "participants' assessment of the labor market"),
+                ("growth", "staff and participants' outlook for activity"),
+                (
+                    "policy_guidance",
+                    "participants' views on the appropriate policy path, "
+                    "including 'many', 'some', 'a few' participants qualifiers",
+                ),
+                ("balance_sheet", "discussion of balance-sheet runoff and reserves"),
+            ),
+            notes=(
+                "Staff review sections describe data, not policy views; weight the "
+                "participants' discussion and the policy action.",
+            ),
+        ),
+        ("BOE", "mpc_minutes"): ToneProfile(
+            id="boe-mpc-minutes-v1",
+            institution="Monetary Policy Committee of the Bank of England",
+            document="minutes of the MPC meeting, including individual members' views",
+            policy_instrument="Bank Rate; gilt holdings (quantitative tightening)",
+            mandate="2% CPI inflation target set by the government",
+            dimension_guidance=(
+                ("inflation", "CPI, services inflation and persistence"),
+                ("labor", "pay growth and labour-market tightness"),
+                ("growth", "UK activity and outlook"),
+                (
+                    "policy_guidance",
+                    "the Committee's decision and the balance of members' votes and stated reasons",
+                ),
+                ("balance_sheet", "gilt stock reduction (QT)"),
+            ),
+            notes=(
+                "Members' individual statements show the spread of views; the overall score "
+                "reflects the Committee as a whole.",
+            ),
+        ),
+    }
+)
+
+# Document types scored per speaker; kept out of committee timelines unless asked for.
+SPEAKER_DOCUMENT_TYPES = frozenset({"speech"})
+
 GENERIC = ToneProfile(
     id=GENERIC_ID,
     institution="a central bank (no specific profile configured)",

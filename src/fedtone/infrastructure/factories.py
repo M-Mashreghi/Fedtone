@@ -10,9 +10,11 @@ from fedtone.application.sources import SourceRegistry
 from fedtone.domain.market import Instrument, ValueKind
 from fedtone.infrastructure.llm.openai_compatible import OpenAICompatibleClient
 from fedtone.infrastructure.market.fred import FRED_CSV_URL, CsvFileProvider, FredCsvProvider
-from fedtone.infrastructure.sources.boe import BoeSummaryAdapter
+from fedtone.infrastructure.sources.boe import BoeMinutesAdapter, BoeSummaryAdapter
 from fedtone.infrastructure.sources.ecb import EcbDecisionAdapter
+from fedtone.infrastructure.sources.fed_speeches import FedSpeechAdapter
 from fedtone.infrastructure.sources.fomc import FomcStatementAdapter
+from fedtone.infrastructure.sources.fomc_minutes import FomcMinutesAdapter
 from fedtone.infrastructure.sources.http import HttpFetcher
 from fedtone.infrastructure.sources.snb import SnbAssessmentAdapter
 from fedtone.settings import Settings
@@ -28,8 +30,11 @@ def build_registry(settings: Settings, client: httpx.Client) -> SourceRegistry:
     return SourceRegistry(
         [
             FomcStatementAdapter(fetcher, listing_urls=sources.fomc_listing_urls),
+            FomcMinutesAdapter(fetcher, listing_urls=sources.fomc_listing_urls),
+            FedSpeechAdapter(fetcher, listing_urls=sources.fed_speech_listing_urls),
             EcbDecisionAdapter(fetcher, listing_urls=sources.ecb_listing_urls or None),
             BoeSummaryAdapter(fetcher, listing_urls=sources.boe_listing_urls),
+            BoeMinutesAdapter(fetcher, listing_urls=sources.boe_listing_urls),
             SnbAssessmentAdapter(fetcher, listing_urls=sources.snb_listing_urls),
         ]
     )

@@ -89,7 +89,13 @@ def test_registry_holds_all_four_banks(database_url) -> None:
         (a.central_bank, a.document_type) for a in registry(settings(database_url), None).adapters()
     ]
 
-    assert keys == sorted([("FED", "fomc_statement"), *SOURCES])
+    committee_and_speech = [
+        ("FED", "fomc_statement"),
+        ("FED", "fomc_minutes"),
+        ("FED", "speech"),
+        ("BOE", "mpc_minutes"),
+    ]
+    assert keys == sorted([*committee_and_speech, *SOURCES])
 
 
 @pytest.mark.parametrize(("bank", "doc_type"), SOURCES)

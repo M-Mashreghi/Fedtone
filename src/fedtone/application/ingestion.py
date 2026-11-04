@@ -232,6 +232,7 @@ class IngestionService:
         fetched: FetchedContent,
     ) -> DocumentText:
         parsed = adapter.parse(fetched)
+        document.speaker = parsed.speaker
         return DocumentText.from_parsed(
             document_id=document.id,
             snapshot_id=snapshot_id,

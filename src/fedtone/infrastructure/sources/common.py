@@ -10,7 +10,8 @@ from bs4 import BeautifulSoup, Tag, XMLParsedAsHTMLWarning
 
 from fedtone.application.sources import PermanentSourceError
 
-ABSOLUTE_URL = re.compile(r"https?://[^\s\"'<>]+")
+# "]" ends a URL too: RSS feeds wrap links in CDATA sections ("...htm]]>").
+ABSOLUTE_URL = re.compile(r"https?://[^\s\"'<>\]]+")
 ENGLISH_DATE = re.compile(r"(\d{1,2})\s+([A-Z][a-z]+)\s+(\d{4})")
 
 
