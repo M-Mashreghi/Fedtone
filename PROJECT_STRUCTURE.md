@@ -14,7 +14,7 @@ FedTone/
 ├── alembic.ini
 ├── .gitignore
 ├── .env.example
-├── migrations/             # Alembic env + versions/0001–0004
+├── migrations/             # Alembic env + versions/0001–0007
 ├── scripts/
 │   ├── capture_fomc_fixtures.py  # saves official pages into tests/fixtures/fomc/live
 │   └── capture_bank_fixtures.py  # ECB/BoE/SNB pages into tests/fixtures/<bank>/live
@@ -29,14 +29,16 @@ FedTone/
 │   └── fedtone/
 │       ├── settings.py     # Pydantic settings + secret redaction
 │       ├── observability.py # JSON logging, correlation ids, secret scrubbing
-│       ├── cli.py          # ingest … summarize, publish, schedule, backup, restore
-│       ├── domain/         # lifecycle, models (+ guard), text, linking, tone_schema, evidence, diff, market, calendar, metrics, analogues, summary
+│       ├── cli.py          # ingest … publish, schedule, agent-notes, alerts, search, intraday, backup, restore
+│       ├── domain/         # lifecycle, models (+ guard), text, linking, tone_schema, evidence, diff, market, calendar, metrics, analogues, summary,
+│       │                   # agent_notes, alerts, intraday
 │       ├── application/    # ports, sources, ingestion, llm, prompts, tone_profiles, tone_analysis, review, evaluation,
 │       │                   # market_data, market_reaction, analogue_search, research_summary,
-│       │                   # research_queries, research_export, pipeline, publication, scheduler
+│       │                   # research_queries, research_export, pipeline, publication, scheduler,
+│       │                   # tone_profiles, agentic_research, alerting, historical_search
 │       ├── infrastructure/
 │       │   ├── persistence/ # db.py, orm.py, repositories.py, backup.py
-│       │   ├── sources/    # http.py (retry), fomc.py, ecb.py, boe.py, snb.py (PDF), common.py, manual.py
+│       │   ├── sources/    # http.py (retry), fomc.py, ecb.py, boe.py, snb.py (PDF), fed_speeches.py, fomc_minutes.py, common.py, manual.py
 │       │   ├── llm/        # openai_compatible.py
 │       │   ├── market/     # fred.py (FRED CSV + local CSV providers)
 │       │   ├── factories.py # adapter construction shared by CLI and API

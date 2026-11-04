@@ -120,6 +120,30 @@ synthetic fixtures in `tests/fixtures/<bank>/synthetic/` to see what changed.
 
 ---
 
+### Speeches, minutes, agentic notes, search and alerts (Phase 7.3–7.5)
+
+```bash
+fedtone ingest --bank FED --type speech             # also: fomc_minutes; BOE mpc_minutes
+fedtone analyze --bank FED --type speech
+curl -fsS "http://localhost:8000/api/v1/speakers"
+curl -fsS "http://localhost:8000/api/v1/timeline?speaker=Jerome%20H.%20Powell"
+fedtone agent-notes                                  # evidence-gated agentic notes (LLM)
+curl -fsS "http://localhost:8000/api/v1/documents/DOCUMENT_ID/agent-note"
+fedtone alerts                                       # evaluate + list tone-change alerts
+fedtone search "balance sheet runoff" --as-of 2024-06-01T00:00:00+00:00
+curl -fsS -X POST http://localhost:8000/api/v1/ask -H 'Content-Type: application/json' \
+     -d '{"question": "When did the Committee mention cumulative tightening?"}'
+fedtone intraday DOCUMENT_ID --symbol SP500 --before 15 --after 60   # optional
+```
+
+- An agentic note that is missing: no claim passed the evidence gate and reviewer; see the
+  review item and `GET .../agent-note` rejected claims after a later successful run.
+- `/ask` with `refused: true`: read `problems` (unknown passage, quote not verbatim, number
+  not in cited passages, causal wording). This is the intended safety behavior.
+- Alert webhook failures appear in the `alerts` stage `notes`; alerts stay stored and listed.
+
+---
+
 ## 4. LLM Provider Failure / Model Retirement
 
 **Symptoms:** 401/403, model-not-found, 429, timeout, malformed structured output.
@@ -371,6 +395,10 @@ FEDTONE_DATABASE__URL=sqlite:///./tmp/drill.db fedtone documents
 | `FEDTONE_SOURCES__FOMC_LISTING_URLS` | JSON list of pages scanned for statement links. |
 | `FEDTONE_SOURCES__ECB_LISTING_URLS` | ECB decision lists to scan; empty = current and previous year. |
 | `FEDTONE_SOURCES__BOE_LISTING_URLS` / `__SNB_LISTING_URLS` | BoE (RSS by default) and SNB listing pages. |
+| `FEDTONE_SOURCES__FED_SPEECH_LISTING_URLS` | Fed speeches feed (default `/feeds/speeches.xml`). |
+| `FEDTONE_ALERTS__ENABLED` / `__MIN_ABS_OVERALL_DELTA` / `__CLASSIFICATION_CHANGE` / `__MIN_ABS_DIMENSION_DELTA` / `__MIN_CONFIDENCE` | Alert rules; an empty threshold disables its rule. |
+| `FEDTONE_ALERTS__WEBHOOK_URL` / `__TIMEOUT_SECONDS` | Optional alert webhook (secret; never logged). |
+| `FEDTONE_MARKET_DATA__INTRADAY_DIRECTORY` | Optional intraday CSV folder; empty = intraday off. |
 | `FEDTONE_SOURCES__ENABLED` | JSON list of `BANK/type` pairs for `fedtone schedule`, e.g. `["FED/fomc_statement","ECB/monetary_policy_decision"]`. |
 | `FEDTONE_MARKET_DATA__PROVIDER` | Market-data backend. |
 | `FEDTONE_MARKET_DATA__API_KEY` | Optional provider key (FRED CSV needs none). |
@@ -395,4 +423,5 @@ FEDTONE_DATABASE__URL=sqlite:///./tmp/drill.db fedtone documents
 | 2026-10-13 | Phase 4: `reactions`, `documents`, `analogues`, `summarize` commands and market-data keys. |
 | 2026-11-03 | Phase 5: research API routes, pipeline/review endpoints, dashboard and `FEDTONE_UI__*` keys. |
 | 2026-11-03 | Phase 6: `publish`, `schedule`, `backup`, `restore`; detailed `/ready`; provider counters; Docker procedures. |
+| 2026-11-04 | Phase 7.3–7.5: speeches/minutes/speakers, agentic notes, search and `/ask`, alerts, optional intraday. |
 | 2026-11-03 | Phase 7.1: ECB, BoE and SNB sources (`--bank ECB --type monetary_policy_decision`, etc.), `FEDTONE_SOURCES__ENABLED`, live-page capture script. |

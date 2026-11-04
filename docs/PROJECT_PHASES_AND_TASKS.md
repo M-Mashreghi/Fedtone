@@ -7,7 +7,7 @@ This document decomposes the product into **granular, atomic, strictly testable*
 | Meta | Value |
 |---|---|
 | **Project** | FedTone — LLM-Powered Central Bank Policy Analyzer |
-| **Current status** | `[-]` Phase 7 in progress — Tasks 7.1 and 7.2 completed; Phases 1, 2, 4, 5, 6 completed; Phase 3 awaits a real-model benchmark |
+| **Current status** | `[x]` Phase 7 completed; Phases 1, 2, 4, 5, 6 completed; Phase 3 awaits a real-model benchmark |
 | **Primary MVP** | FOMC statements → tone scoring → statement diff → market reaction → dashboard |
 | **Status legend** | `[ ]` Not Started · `[-]` In Progress · `[x]` Completed |
 | **Related docs** | [ARCHITECTURE](./ARCHITECTURE.md) · [ROADMAP](./ROADMAP.md) · [PHASES](./PHASES.md) · [DIAGRAMS](./DIAGRAMS.md) · [TASKS](./TASKS.md) · [DEPLOYMENT](./DEPLOYMENT.md) · [RUNBOOK](./RUNBOOK.md) |
@@ -262,7 +262,7 @@ FedTone's core value is detecting change, so each statement must reliably link t
 
 - [x] Historical ordering fixtures link correctly.
 - [x] Two identical ingestion runs leave one canonical record set.
-- [ ] Completing Task 2.5 closes Phase 2 / M1 Alpha. *(Phase 2 closes when Tasks 2.2 and 2.4 are verified on official pages)*
+- [x] Completing Task 2.5 closes Phase 2 / M1 Alpha. *(verified on captured official pages, 2026-11-03)*
 
 ---
 
@@ -498,7 +498,7 @@ FedTone should explain a meeting in readable macro-finance language while preser
 
 - [x] Summary references canonical metrics exactly.
 - [x] Unsupported number injection test fails validation.
-- [ ] Completing Task 4.5 closes M3 RC. *(M3 RC also needs the open Phase 2 and Phase 3 items: official FOMC pages and a real-model benchmark)*
+- [ ] Completing Task 4.5 closes M3 RC. *(M3 RC also needs the open Phase 3 item: a real-model benchmark)*
 
 ---
 
@@ -755,18 +755,18 @@ Research history, prompt/model metadata and human review decisions must be recov
 
 ### Task 7.3: Speeches, Minutes & Speaker-Level Tone Analytics
 
-**Status:** `[ ]` Future
+**Status:** `[x]` Completed
 
 **Definition of Done (DoD)**
 
-- [ ] Speaker identity and document type persisted.
-- [ ] Speech scores not mixed with statement baseline without explicit filter.
+- [x] Speaker identity and document type persisted.
+- [x] Speech scores not mixed with statement baseline without explicit filter.
 
 ---
 
 ### Task 7.4: Agentic Research Workflow with Evidence Reviewer
 
-**Status:** `[ ]` Future
+**Status:** `[x]` Completed
 
 **Technical Specification**
 
@@ -780,20 +780,20 @@ Agents:
 
 **Definition of Done (DoD)**
 
-- [ ] Final note cannot publish unsupported claim after reviewer gate.
-- [ ] Canonical scores/metrics remain from existing services, not agent consensus.
+- [x] Final note cannot publish unsupported claim after reviewer gate.
+- [x] Canonical scores/metrics remain from existing services, not agent consensus.
 
 ---
 
 ### Task 7.5: Historical RAG, Alerts & Optional Intraday Extension
 
-**Status:** `[ ]` Future
+**Status:** `[x]` Completed
 
 **Definition of Done (DoD)**
 
-- [ ] RAG retrieves cited historical FedTone records.
-- [ ] Alerts fire only on configurable material-change conditions.
-- [ ] Intraday provider preserves timezone/point-in-time rules if enabled.
+- [x] RAG retrieves cited historical FedTone records.
+- [x] Alerts fire only on configurable material-change conditions.
+- [x] Intraday provider preserves timezone/point-in-time rules if enabled.
 
 ---
 
@@ -829,10 +829,10 @@ Agents:
 | 4 Market Analytics | 4.1–4.5 | 0 | 0 | 5 |
 | 5 Dashboard & API | 5.1–5.5 | 0 | 0 | 5 |
 | 6 Production | 6.1–6.5 | 0 | 1 | 4 |
-| 7 Expansion | 7.1–7.5 | 3 | 0 | 2 |
-| **Total** | **35** | **3** | **2** | **30** |
+| 7 Expansion | 7.1–7.5 | 0 | 0 | 5 |
+| **Total** | **35** | **0** | **2** | **33** |
 
-**Project status:** Phases 1, 2, 4 and 5 completed; Phase 2 verified on captured official FOMC pages; Phase 3 implemented and verified with a fake LLM, awaiting a human-labeled FOMC benchmark and a real-model run; Phase 6 completed except branch protection (a GitHub setting); Phase 7 Tasks 7.1 (ECB, BoE and SNB adapters) and 7.2 (tone profiles) completed.
+**Project status:** Phases 1, 2, 4 and 5 completed; Phase 2 verified on captured official FOMC pages; Phase 3 implemented and verified with a fake LLM, awaiting a human-labeled FOMC benchmark and a real-model run; Phase 6 completed except branch protection (a GitHub setting); Phase 7 completed (7.1 ECB/BoE/SNB adapters, 7.2 tone profiles, 7.3 speeches/minutes/speakers, 7.4 agentic notes, 7.5 historical search, alerts and optional intraday).
 
 ---
 

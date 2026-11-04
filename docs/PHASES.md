@@ -349,7 +349,7 @@ Add end-to-end coverage, scheduled ingestion, observability, Docker, CI/CD, back
 
 ## Phase 7: Multi-Bank, Speech Analytics & Agentic Research
 
-**Status:** `[-]` In Progress — Tasks 7.1 (ECB, BoE, SNB adapters) and 7.2 (tone profiles) completed  
+**Status:** `[x]` Completed — verified with fake LLM / fixture data and captured official pages; intraday is optional and off by default  
 **Roadmap alignment:** M6 Future
 
 ### Scope
@@ -385,7 +385,7 @@ Extend the stable FOMC system into a broader central-bank research platform and 
 
 - [x] New banks use the same core domain contracts without forked pipelines.
 - [x] Bank/document-type calibration is explicit.
-- [ ] Agentic report cannot publish unsupported claims without citations.
+- [x] Agentic report cannot publish unsupported claims without citations.
 - [x] Existing FOMC regression suite remains green. *(re-check after each Phase 7 task)*
 
 ---

@@ -27,6 +27,10 @@ federalreserve.gov ─► Collect & normalize ─► LLM tone analysis ─► Ev
 | **Review queue** | Anything uncertain (parse problems, missing evidence, invalid model output) goes to a human review list instead of being silently accepted. | `fedtone reviews`, `fedtone resolve` |
 | **Research API** | Documents, tone analyses, comparisons, market reactions, analogues, review queue, pipeline runs and telemetry under `/api/v1`, with OpenAPI docs at `/docs`. | `uvicorn ...` |
 | **Dashboard** | Streamlit research UI: tone timeline, meeting detail with evidence beside the score, statement diff, market reaction, analogues, audit trail and CSV/JSON/Markdown exports. | `streamlit run ...` |
+| **Speakers** | Fed speeches and FOMC/BoE minutes, with each speech compared to the same speaker's previous one and a per-speaker tone history. Speeches never mix into statement timelines unless you ask. | `fedtone ingest --type speech`, `/api/v1/speakers` |
+| **Agentic note** | Policy and market analyst agents propose claims; a deterministic evidence gate plus a skeptic reviewer keep only claims whose numbers and quotes come from cited facts. | `fedtone agent-notes` |
+| **Historical search** | Cited paragraph search over everything stored, optionally as of a past date, and `/ask` answers that are refused unless every quote and number is backed by a cited passage. | `fedtone search`, `/api/v1/ask` |
+| **Alerts** | Configurable material tone-change alerts (delta, label change, dimension move), stored once and optionally sent to a webhook. | `fedtone alerts` |
 | **Model benchmark** | Agreement, stability and evidence quality of the configured model against a labeled dataset, as a Markdown/JSON report. | `fedtone benchmark` |
 
 Every stored result records its model, prompt version, schema version and metric version, so an
@@ -216,7 +220,7 @@ docs/               architecture, roadmap, phases, task ledger, runbook
 | 4 | Market reaction, historical analogues, research summaries | Done with fixture market data; live FRED fetch still to be checked |
 | 5 | Research API and dashboard | Done (verified with fixture data) |
 | 6 | Hardening, Docker, production readiness | Done (Docker verified in CI) |
-| 7 | Multi-bank, speeches, agentic research | In progress: ECB, BoE and SNB sources and tone profiles done |
+| 7 | Multi-bank, speeches, agentic research | Done: ECB/BoE/SNB, tone profiles, speeches and minutes, agentic notes, search, alerts, optional intraday |
 
 ## Documentation
 

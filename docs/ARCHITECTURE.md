@@ -156,6 +156,67 @@ are used quantitatively. Editing a profile requires bumping its version suffix.
 
 New dependency: `pypdf` (pure Python) to read SNB assessment PDFs.
 
+### Implementation (Phase 7, Task 7.3) — Speeches, Minutes and Speakers
+
+New sources on the same contract: `FED/speech` (`sources.fed_speeches`, discovery from the
+speeches RSS feed), `FED/fomc_minutes` (`sources.fomc_minutes`, discovery from the FOMC
+calendar) and `BOE/mpc_minutes` (`sources.boe.BoeMinutesAdapter`, the minutes section of the
+summary page). `PolicyDocument.speaker` (migration `0005`) holds the speaker's name with the
+office stripped, so one person keeps one name across roles. Previous-document linking groups
+by bank, type **and speaker**: a speech is compared with the same person's previous speech.
+
+Point-in-time: a speech's page states only its date, so `published_at` is 23:59 New York on
+that day (never earlier than the speech). Minutes are published three weeks after the policy
+decision at 14:00 ET; discovery skips minutes whose release time is still in the future.
+
+Speeches never enter committee views by default: `/documents`, `/timeline` and exports
+exclude `speech` unless `document_type=speech`, `speaker=...` or `include_speeches=true` is
+given. `GET /api/v1/speakers` lists speech counts, first/last dates, latest score and the
+plain mean of stored scores per speaker. Speeches and minutes have their own tone profiles
+(`fed-speech-v1`, `fed-fomc-minutes-v1`, `boe-mpc-minutes-v1`), so their scores form separate
+baselines.
+
+### Implementation (Phase 7, Task 7.4) — Agentic Research Notes
+
+`fedtone.application.agentic_research` runs five roles in a fixed order (no agent framework):
+
+| Agent | Kind | Output |
+|---|---|---|
+| Data Agent | deterministic | facts with ids and canonical display strings (`build_facts`) from stored analysis, comparison and metrics |
+| Policy Analyst | LLM | up to 4 claims about the policy language, each citing fact ids |
+| Market Analyst | LLM (market facts only) | up to 4 claims about the observed reaction |
+| Skeptic / Evidence Reviewer | deterministic gate + LLM verdict | `check_claim`: known cited ids, market claims cite market facts, every number copied from a *cited* fact (sign included), quotes verbatim, no causal wording; then a reviewer verdict per surviving claim |
+| Research Note Composer | deterministic | Markdown from accepted claims only, each with its citations, plus a table of the cited facts' canonical values |
+
+A claim is published only if the gate finds nothing and the reviewer marks it supported (a
+missing verdict counts as unsupported). No accepted claim → nothing stored, review item
+opened. Rejected claims are stored with their reasons for audit (`agent_research_notes`,
+migration `0006`). Scores and metrics are never produced by agents. Entry points:
+`fedtone agent-notes`, optional pipeline stage `agent_notes` (not in the default cycle),
+`POST`/`GET /api/v1/documents/{id}/agent-note`. Prompt version `agent-research-v1`, schema
+`agent-claims-1.0`.
+
+### Implementation (Phase 7, Task 7.5) — Historical Search, Alerts, Intraday
+
+- **Historical retrieval (RAG)** — `fedtone.application.historical_search`: BM25 over the
+  paragraphs of each document's latest normalized text, no embeddings or vector store.
+  Every hit is a citation (`<document_id>:<paragraph>`, exact text, source URL) with the
+  stored tone record. `as_of` limits the corpus to documents published by then.
+  `POST /api/v1/ask` sends only retrieved passages to the LLM; the answer is returned only
+  if every cited passage exists, every quote is verbatim from it, every number appears in a
+  cited passage and there is no causal wording — otherwise it is refused (`answer: null`).
+- **Alerts** — `fedtone.domain.alerts` (deterministic rules: overall delta, label change,
+  dimension delta, confidence floor; `FEDTONE_ALERTS__*`) and the `alerts` stage
+  (`fedtone.application.alerting`, after `analyze` in the cycle). Each (document, rule) fires
+  once (`alerts` table, migration `0007`); notifications go to the log and optionally a
+  webhook (`FEDTONE_ALERTS__WEBHOOK_URL`, treated as a secret). A failing webhook is counted
+  and does not stop the stage. `GET /api/v1/alerts`, `fedtone alerts`.
+- **Intraday (optional, off by default)** — `fedtone.domain.intraday` computes `[-b,+a]`
+  minute windows from timezone-aware observations in UTC; observations after `as_of` are
+  never read and windows not yet closed are reported as such. `IntradayCsvProvider` rejects
+  naive timestamps and duplicates. Enabled by `FEDTONE_MARKET_DATA__INTRADAY_DIRECTORY`;
+  `fedtone intraday DOCUMENT_ID --symbol S`. Results are computed on demand, not stored.
+
 ### Ingestion Guarantees
 
 - Canonical URLs and content hashes prevent duplicate ingestion.
