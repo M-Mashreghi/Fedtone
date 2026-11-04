@@ -54,6 +54,11 @@ def _numbers(text: str) -> list[tuple[str, str]]:
     return [(sign, digits) for sign, digits in _NUMBER.findall(text)]
 
 
+# Shared with the agentic note gate (fedtone.domain.agent_notes).
+numbers_in = _numbers
+CAUSAL_PATTERN = _CAUSAL
+
+
 def validate_summary(output: SummaryOutput, facts: Sequence[Fact]) -> list[str]:
     problems = []
     known = {f.id for f in facts}

@@ -11,6 +11,7 @@
     fedtone analogues DOCUMENT_ID       # most similar earlier meetings and their reactions
     fedtone summarize                   # LLM research summary over computed facts
     fedtone publish                     # publish summarized, market-linked documents
+    fedtone agent-notes                 # agentic research notes behind an evidence gate
     fedtone schedule [--once]           # recurring ingest → … → publish cycles
     fedtone backup [--verify FILE]      # verified SQLite snapshot with retention
     fedtone restore FILE --yes          # replace the database with a verified backup
@@ -71,7 +72,7 @@ from fedtone.infrastructure.persistence.repositories import (
     SqlAlchemySourceSnapshotRepository,
     SqlAlchemyToneAnalysisRepository,
 )
-from fedtone.infrastructure.pipeline import default_stage_runners
+from fedtone.infrastructure.pipeline import agent_service, default_stage_runners
 from fedtone.observability import configure_logging
 from fedtone.settings import Settings, get_settings
 
@@ -297,6 +298,18 @@ def _summarize(args: argparse.Namespace, settings: Settings) -> int:
     return 0
 
 
+def _agent_notes(args: argparse.Namespace, settings: Settings) -> int:
+    try:
+        client = build_llm_client(settings)
+    except LLMPermanentError as exc:
+        print(f"error: {exc} (set FEDTONE_LLM__API_KEY and FEDTONE_LLM__MODEL)", file=sys.stderr)
+        return 2
+    session_factory = create_session_factory(create_db_engine(settings.database.url))
+    report = agent_service(settings, session_factory, client).run(args.bank, args.type)
+    print(", ".join(f"{name}={value}" for name, value in report.outcomes.items()))
+    return 0
+
+
 def _publish(args: argparse.Namespace, settings: Settings) -> int:
     session_factory = create_session_factory(create_db_engine(settings.database.url))
     report = PublicationService(
@@ -433,6 +446,7 @@ def build_parser() -> argparse.ArgumentParser:
         ("reactions", _reactions, "market reactions for compared documents"),
         ("summarize", _summarize, "LLM research summaries for market-linked documents"),
         ("publish", _publish, "publish summarized, market-linked documents"),
+        ("agent-notes", _agent_notes, "agentic research notes (evidence-gated)"),
         ("schedule", _schedule, "run pipeline cycles every scheduler interval"),
     ):
         sub = commands.add_parser(name, help=text)

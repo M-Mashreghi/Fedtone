@@ -9,8 +9,15 @@ from sqlalchemy import Engine
 
 from fedtone import __version__
 from fedtone.api.routes import Services, router
+from fedtone.application.agentic_research import AgentResearchService
 from fedtone.application.analogue_search import AnalogueService
-from fedtone.application.pipeline import PipelineService, PipelineStage, StageRunner
+from fedtone.application.llm import LLMPermanentError
+from fedtone.application.pipeline import (
+    PipelineService,
+    PipelineStage,
+    StageRunner,
+    StageUnavailableError,
+)
 from fedtone.application.research_queries import ResearchQueryService
 from fedtone.application.review import ReviewService
 from fedtone.infrastructure.persistence.db import (
@@ -20,6 +27,7 @@ from fedtone.infrastructure.persistence.db import (
     schema_revision,
 )
 from fedtone.infrastructure.persistence.repositories import (
+    SqlAlchemyAgentNoteRepository,
     SqlAlchemyComparisonRepository,
     SqlAlchemyEventMetricRepository,
     SqlAlchemyPolicyDocumentRepository,
@@ -29,7 +37,11 @@ from fedtone.infrastructure.persistence.repositories import (
     SqlAlchemySourceSnapshotRepository,
     SqlAlchemyToneAnalysisRepository,
 )
-from fedtone.infrastructure.pipeline import AdapterFactories, default_stage_runners
+from fedtone.infrastructure.pipeline import (
+    AdapterFactories,
+    agent_service,
+    default_stage_runners,
+)
 from fedtone.observability import configure_logging
 from fedtone.settings import Settings, get_settings
 
@@ -134,6 +146,17 @@ def _build_services(
     reviews = SqlAlchemyReviewItemRepository(session_factory)
     if stage_runners is None:
         stage_runners = default_stage_runners(settings, session_factory, adapter_factories)
+    factories = adapter_factories or AdapterFactories()
+
+    def agent_research() -> AgentResearchService:
+        try:
+            client = factories.llm_client(settings)
+        except LLMPermanentError as exc:
+            raise StageUnavailableError(
+                f"{exc} (set FEDTONE_LLM__API_KEY and FEDTONE_LLM__MODEL)"
+            ) from exc
+        return agent_service(settings, session_factory, client)
+
     return Services(
         queries=ResearchQueryService(
             documents=documents,
@@ -150,6 +173,8 @@ def _build_services(
         ),
         reviews=ReviewService(documents, reviews),
         pipeline=PipelineService(stage_runners),
+        agent_notes=SqlAlchemyAgentNoteRepository(session_factory),
+        agent_research=agent_research,
         analogue_top_k=settings.market_data.analogue_top_k,
         analogue_min_sample=settings.market_data.analogue_min_sample,
     )

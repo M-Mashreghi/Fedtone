@@ -277,3 +277,19 @@ class ResearchSummaryRow(Base):
     cited_fact_ids: Mapped[list[str]] = mapped_column(JSON)
     uncertainty_flags: Mapped[list[str]] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+
+class AgentNoteRow(Base):
+    __tablename__ = "agent_research_notes"
+    __table_args__ = (Index("ix_agent_research_notes_document_id", "document_id"),)
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    document_id: Mapped[UUID] = mapped_column(ForeignKey("policy_documents.id"))
+    model: Mapped[str] = mapped_column(String(128))
+    prompt_version: Mapped[str] = mapped_column(String(64))
+    schema_version: Mapped[str] = mapped_column(String(32))
+    metric_version: Mapped[str] = mapped_column(String(32))
+    facts: Mapped[list[dict]] = mapped_column(JSON)
+    claims: Mapped[list[dict]] = mapped_column(JSON)
+    markdown: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())

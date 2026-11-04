@@ -12,6 +12,8 @@ from fastapi import status as http
 
 from fedtone import __version__
 from fedtone.api.schemas import (
+    AgentNoteOut,
+    AgentRunOut,
     AnaloguesOut,
     AnalysisOut,
     AuditOut,
@@ -31,8 +33,10 @@ from fedtone.api.schemas import (
     document_detail_out,
     market_reaction_out,
 )
+from fedtone.application.agentic_research import AgentResearchService
 from fedtone.application.analogue_search import AnalogueService
 from fedtone.application.pipeline import PipelineService, PipelineStage, StageUnavailableError
+from fedtone.application.ports import AgentNoteRepository
 from fedtone.application.prompts import COMPARISON_PROMPT_VERSION, STATEMENT_PROMPT_VERSION
 from fedtone.application.research_export import research_note, signals_to_csv, signals_to_json
 from fedtone.application.research_queries import (
@@ -71,6 +75,9 @@ class Services:
     analogues: AnalogueService
     reviews: ReviewService
     pipeline: PipelineService
+    agent_notes: AgentNoteRepository | None = None
+    # Builds the agentic workflow; raises StageUnavailableError without an LLM.
+    agent_research: Callable[[], AgentResearchService] | None = None
     analogue_top_k: int = 5
     analogue_min_sample: int = 3
 
@@ -221,6 +228,30 @@ def get_research_note(document_id: UUID, services: ServicesDep) -> Response:
     detail = _detail(services, document_id)
     note = research_note(detail, services.queries.previous_analysis(detail.comparison))
     return Response(note, media_type="text/markdown; charset=utf-8")
+
+
+@router.get("/documents/{document_id}/agent-note", response_model=AgentNoteOut, tags=["exports"])
+def get_agent_note(document_id: UUID, services: ServicesDep) -> AgentNoteOut:
+    """Latest published agentic note, with accepted and rejected claims for audit."""
+    _detail(services, document_id)
+    note = services.agent_notes.latest_for_document(document_id) if services.agent_notes else None
+    if note is None:
+        raise HTTPException(http.HTTP_404_NOT_FOUND, "no agentic note stored")
+    return AgentNoteOut.of(note)
+
+
+@router.post("/documents/{document_id}/agent-note", response_model=AgentRunOut, tags=["exports"])
+def create_agent_note(document_id: UUID, services: ServicesDep) -> AgentRunOut:
+    """Run the agentic workflow for one document now. Only claims that pass the evidence
+    gate and the reviewer are published; otherwise a review item is opened."""
+    _detail(services, document_id)
+    if services.agent_research is None:
+        raise HTTPException(http.HTTP_409_CONFLICT, "agentic research is not configured")
+    try:
+        outcome, note = services.agent_research().run_document(document_id)
+    except StageUnavailableError as exc:
+        raise HTTPException(http.HTTP_409_CONFLICT, str(exc)) from exc
+    return AgentRunOut(outcome=outcome.value, note=AgentNoteOut.of(note) if note else None)
 
 
 @router.get("/timeline", response_model=TimelineOut, tags=["analysis"])

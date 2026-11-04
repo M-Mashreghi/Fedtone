@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
+from fedtone.domain.agent_notes import AgentNote, NoteClaim, Section
 from fedtone.domain.lifecycle import DocumentStatus
 from fedtone.domain.market import MarketSeries, Observation
 from fedtone.domain.metrics import EventMetric, MetricKind, MetricUnit, MissingReason
@@ -27,6 +28,7 @@ from fedtone.domain.models import (
 )
 from fedtone.domain.summary import Fact, ResearchSummary
 from fedtone.infrastructure.persistence.orm import (
+    AgentNoteRow,
     DocumentComparisonRow,
     DocumentStatusChangeRow,
     DocumentTextRow,
@@ -733,5 +735,62 @@ class SqlAlchemyResearchSummaryRepository:
                 summary=row.summary,
                 cited_fact_ids=tuple(row.cited_fact_ids),
                 uncertainty_flags=tuple(row.uncertainty_flags),
+                created_at=row.created_at,
+            )
+
+
+class SqlAlchemyAgentNoteRepository:
+    def __init__(self, session_factory: sessionmaker[Session]) -> None:
+        self._session_factory = session_factory
+
+    def add(self, note: AgentNote) -> None:
+        with self._session_factory() as session:
+            session.add(
+                AgentNoteRow(
+                    id=note.id,
+                    document_id=note.document_id,
+                    model=note.model,
+                    prompt_version=note.prompt_version,
+                    schema_version=note.schema_version,
+                    metric_version=note.metric_version,
+                    facts=[f.as_dict() for f in note.facts],
+                    claims=[c.as_dict() for c in note.claims],
+                    markdown=note.markdown,
+                    created_at=note.created_at,
+                )
+            )
+            session.commit()
+
+    def latest_for_document(self, document_id: UUID) -> AgentNote | None:
+        with self._session_factory() as session:
+            row = session.scalars(
+                select(AgentNoteRow)
+                .where(AgentNoteRow.document_id == document_id)
+                .order_by(AgentNoteRow.created_at.desc())
+                .limit(1)
+            ).one_or_none()
+            if row is None:
+                return None
+            return AgentNote(
+                id=row.id,
+                document_id=row.document_id,
+                model=row.model,
+                prompt_version=row.prompt_version,
+                schema_version=row.schema_version,
+                metric_version=row.metric_version,
+                facts=tuple(Fact(**f) for f in row.facts),
+                claims=tuple(
+                    NoteClaim(
+                        claim_id=c["claim_id"],
+                        section=Section(c["section"]),
+                        text=c["text"],
+                        cited_fact_ids=tuple(c["cited_fact_ids"]),
+                        accepted=c["accepted"],
+                        problems=tuple(c["problems"]),
+                        reviewer_reason=c["reviewer_reason"],
+                    )
+                    for c in row.claims
+                ),
+                markdown=row.markdown,
                 created_at=row.created_at,
             )

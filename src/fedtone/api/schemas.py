@@ -20,6 +20,7 @@ from fedtone.application.research_queries import (
     signal_record,
 )
 from fedtone.application.tone_profiles import ToneProfile
+from fedtone.domain.agent_notes import AgentNote
 from fedtone.domain.models import (
     DocumentComparison,
     ProcessingRun,
@@ -497,6 +498,51 @@ class ToneProfileOut(BaseModel):
             dimension_guidance=dict(profile.dimension_guidance),
             notes=list(profile.notes),
         )
+
+
+class AgentClaimOut(BaseModel):
+    claim_id: str
+    section: str
+    text: str
+    cited_fact_ids: list[str]
+    accepted: bool
+    problems: list[str]
+    reviewer_reason: str | None
+
+
+class AgentNoteOut(BaseModel):
+    id: UUID
+    document_id: UUID
+    model: str
+    prompt_version: str
+    schema_version: str
+    metric_version: str
+    markdown: str
+    accepted: list[AgentClaimOut]
+    rejected: list[AgentClaimOut]
+    facts: list[dict[str, str]]
+    created_at: datetime
+
+    @classmethod
+    def of(cls, note: AgentNote) -> "AgentNoteOut":
+        return cls(
+            id=note.id,
+            document_id=note.document_id,
+            model=note.model,
+            prompt_version=note.prompt_version,
+            schema_version=note.schema_version,
+            metric_version=note.metric_version,
+            markdown=note.markdown,
+            accepted=[AgentClaimOut.model_validate(c.as_dict()) for c in note.accepted],
+            rejected=[AgentClaimOut.model_validate(c.as_dict()) for c in note.rejected],
+            facts=[f.as_dict() for f in note.facts],
+            created_at=note.created_at,
+        )
+
+
+class AgentRunOut(BaseModel):
+    outcome: str
+    note: AgentNoteOut | None
 
 
 class ResolveIn(BaseModel):

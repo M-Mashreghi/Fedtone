@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import httpx
 from sqlalchemy.orm import Session, sessionmaker
 
+from fedtone.application.agentic_research import AgentResearchService
 from fedtone.application.ingestion import IngestionService
 from fedtone.application.llm import LLMClient, LLMPermanentError
 from fedtone.application.market_data import MarketDataProvider
@@ -33,6 +34,7 @@ from fedtone.infrastructure.factories import (
     build_registry,
 )
 from fedtone.infrastructure.persistence.repositories import (
+    SqlAlchemyAgentNoteRepository,
     SqlAlchemyComparisonRepository,
     SqlAlchemyEventMetricRepository,
     SqlAlchemyMarketObservationRepository,
@@ -60,6 +62,22 @@ class AdapterFactories:
     llm_client: Callable[[Settings], LLMClient] = build_llm_client
     market_provider: Callable[[Settings, httpx.Client], MarketDataProvider | None] = (
         build_market_provider
+    )
+
+
+def agent_service(
+    settings: Settings, session_factory: sessionmaker[Session], client: LLMClient
+) -> AgentResearchService:
+    return AgentResearchService(
+        client=client,
+        documents=SqlAlchemyPolicyDocumentRepository(session_factory),
+        analyses=SqlAlchemyToneAnalysisRepository(session_factory),
+        comparisons=SqlAlchemyComparisonRepository(session_factory),
+        metrics=SqlAlchemyEventMetricRepository(session_factory),
+        notes=SqlAlchemyAgentNoteRepository(session_factory),
+        reviews=SqlAlchemyReviewItemRepository(session_factory),
+        instrument_names={i.symbol: i.name for i in settings.market_data.instruments},
+        temperature=settings.llm.temperature,
     )
 
 
@@ -165,6 +183,11 @@ def default_stage_runners(
         outcomes = {k.value: v for k, v in report.outcomes.items()}
         return PipelineResult(PipelineStage.SUMMARIZE, outcomes, aborted=report.aborted)
 
+    def agent_notes(bank: str, doc_type: str, trigger: RunTrigger) -> PipelineResult:
+        report = agent_service(settings, session_factory, llm()).run(bank, doc_type)
+        outcomes = {k.value: v for k, v in report.outcomes.items()}
+        return PipelineResult(PipelineStage.AGENT_NOTES, outcomes)
+
     def publish(bank: str, doc_type: str, trigger: RunTrigger) -> PipelineResult:
         report = PublicationService(
             documents=documents,
@@ -181,4 +204,5 @@ def default_stage_runners(
         PipelineStage.REACTIONS: reactions,
         PipelineStage.SUMMARIZE: summarize,
         PipelineStage.PUBLISH: publish,
+        PipelineStage.AGENT_NOTES: agent_notes,
     }

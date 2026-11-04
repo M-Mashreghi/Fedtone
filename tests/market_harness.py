@@ -58,6 +58,7 @@ def market_data() -> dict[str, dict[date, float | None]]:
 
 class MarketHarness:
     def __init__(self, session_factory, releases=RELEASES) -> None:
+        self.session_factory = session_factory
         self.documents = SqlAlchemyPolicyDocumentRepository(session_factory)
         self.snapshots = SqlAlchemySourceSnapshotRepository(session_factory)
         self.reviews = SqlAlchemyReviewItemRepository(session_factory)

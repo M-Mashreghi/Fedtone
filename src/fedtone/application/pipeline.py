@@ -23,10 +23,18 @@ class PipelineStage(StrEnum):
     REACTIONS = "reactions"
     SUMMARIZE = "summarize"
     PUBLISH = "publish"
+    # Optional: agentic research notes (Task 7.4); not part of the default cycle.
+    AGENT_NOTES = "agent_notes"
 
 
 # Order of one full pipeline cycle.
-CYCLE = tuple(PipelineStage)
+CYCLE = (
+    PipelineStage.INGEST,
+    PipelineStage.ANALYZE,
+    PipelineStage.REACTIONS,
+    PipelineStage.SUMMARIZE,
+    PipelineStage.PUBLISH,
+)
 
 
 class StageUnavailableError(RuntimeError):

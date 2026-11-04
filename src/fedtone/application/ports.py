@@ -8,6 +8,7 @@ from datetime import date, datetime
 from typing import Protocol
 from uuid import UUID
 
+from fedtone.domain.agent_notes import AgentNote
 from fedtone.domain.lifecycle import DocumentStatus
 from fedtone.domain.market import MarketSeries, Observation
 from fedtone.domain.metrics import EventMetric
@@ -152,3 +153,11 @@ class ResearchSummaryRepository(Protocol):
     def add(self, summary: ResearchSummary) -> None: ...
 
     def latest_for_document(self, document_id: UUID) -> ResearchSummary | None: ...
+
+
+class AgentNoteRepository(Protocol):
+    """Published agentic research notes (Task 7.4); append-only."""
+
+    def add(self, note: AgentNote) -> None: ...
+
+    def latest_for_document(self, document_id: UUID) -> AgentNote | None: ...
