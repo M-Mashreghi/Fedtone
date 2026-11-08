@@ -150,9 +150,12 @@ and `/ready` (database readiness). Research routes, all under `/api/v1`:
 | `GET /documents/{id}/analysis`, `/comparison`, `/market-reaction`, `/analogues`, `/audit` | The individual parts. |
 | `GET /documents/{id}/research-note` | Markdown research note. |
 | `GET /timeline`, `GET /exports/signals?format=csv` (or `json`) | The same signal records, for charts and downloads. |
-| `POST /pipeline/{stage}` with `ingest`, `analyze`, `reactions` or `summarize` | Runs a stage now; re-running retries provider failures. |
+| `POST /pipeline/{stage}` with `ingest`, `analyze`, `alerts`, `reactions`, `summarize`, `publish` or `agent_notes` | Runs a stage now; re-running retries provider failures. `agent_notes` is optional and not part of the default cycle. |
 | `GET /reviews`, `POST /reviews/{id}/resolve` | Review queue; `{"note": "...", "resume": true}` continues the document. |
-| `GET /runs`, `GET /system/telemetry` | Ingestion runs, document counts per status, active versions. |
+| `GET /speakers` | Per-speaker tone history for Fed speeches and minutes. |
+| `GET /search`, `POST /ask` | Point-in-time search over stored paragraphs, and an answer that must cite them. |
+| `GET /alerts`, `GET/POST /documents/{id}/agent-note` | Tone-shift alerts and reviewed agentic research notes. |
+| `GET /runs`, `GET /system/telemetry`, `GET /system/tone-profiles` | Ingestion runs, document counts per status, active versions, per-bank tone profiles. |
 
 The dashboard reads the API at `FEDTONE_UI__API_BASE_URL` (default `http://127.0.0.1:8000`).
 Pick a meeting on the timeline, then read its score next to the evidence, the language changes,
@@ -201,26 +204,43 @@ python scripts/capture_fomc_fixtures.py # capture real FOMC pages for the live-f
 src/fedtone/
   domain/           pure research logic: tone schema, diff, evidence, calendars, metrics, analogues
   application/      services and ports: ingestion, tone analysis, market reaction, summaries
-  infrastructure/   adapters: FOMC source, OpenAI-compatible LLM, FRED/CSV market data, SQLite
+  infrastructure/   adapters: Fed (statements, minutes, speeches), ECB, BoE, SNB sources,
+                    OpenAI-compatible LLM, FRED/CSV/intraday market data, SQLite, backups
   api/              FastAPI app: research routes, response schemas, pipeline wiring
   ui/               Streamlit dashboard (reads the API over HTTP)
   cli.py            the `fedtone` command
 migrations/         Alembic schema migrations
-tests/              unit and integration tests with saved fixtures
+tests/              unit, integration, API, UI and end-to-end tests with saved fixtures
 docs/               architecture, roadmap, phases, task ledger, runbook
 ```
 
 ## Status
 
+All seven phases are implemented. The full suite (660 tests: unit, integration, API, UI and
+end-to-end) passes with fixtures and a fake LLM, and `ruff check .` is clean.
+
 | Phase | Scope | State |
 |---|---|---|
 | 1 | Foundation, data layer, research domain | Done |
-| 2 | Official FOMC ingestion and normalization | Implemented; closes once captured live pages pass the fixture tests |
-| 3 | LLM hawkish/dovish tone engine | Implemented with a fake LLM; closes after a human-labeled benchmark on a real model |
-| 4 | Market reaction, historical analogues, research summaries | Done with fixture market data; live FRED fetch still to be checked |
+| 2 | Official FOMC ingestion and normalization | Done; parsers verified against captured live federalreserve.gov pages |
+| 3 | LLM hawkish/dovish tone engine | Mostly done; evaluation (Task 3.5) still needs a human-labeled benchmark and a real-model run |
+| 4 | Market reaction, historical analogues, research summaries | Done with fixture market data; a live FRED fetch is still to be checked |
 | 5 | Research API and dashboard | Done (verified with fixture data) |
-| 6 | Hardening, Docker, production readiness | Done (Docker verified in CI) |
+| 6 | Hardening, Docker, CI/CD, backups | Mostly done; CI runs on every PR, but merge blocking (Task 6.4) needs branch protection in GitHub settings |
 | 7 | Multi-bank, speeches, agentic research | Done: ECB/BoE/SNB, tone profiles, speeches and minutes, agentic notes, search, alerts, optional intraday |
+
+### Still open
+
+- **Real benchmark (Task 3.5).** `tests/fixtures/eval/mini_benchmark.json` is a synthetic
+  three-item set that only tests the harness. Tone scores should not be trusted quantitatively
+  until a model has been run on human-labeled official FOMC statements.
+- **Branch protection (Task 6.4).** Make the CI checks required on `main`; see
+  [DEPLOYMENT](docs/DEPLOYMENT.md) section 2.
+- **Live FRED check (Task 4.1).** Run `fedtone reactions` once against the live FRED service.
+- **Cross-bank calibration.** ECB, BoE and SNB tone profiles are prompt context, not a statistical
+  calibration; a per-bank labeled benchmark is needed before comparing scores across banks.
+- **Non-US market instruments.** Market reactions for non-US banks currently use the configured
+  US instruments.
 
 ## Documentation
 
@@ -239,3 +259,7 @@ FedTone بیانیه‌های رسمی فدرال رزرو (FOMC) را جمع‌
 بدون سوگیری نگاه به آینده پیدا می‌کند و یک یادداشت پژوهشی کوتاه می‌نویسد که فقط اعداد محاسبه‌شده را
 نقل می‌کند. همه‌ی این نتایج از طریق یک API و یک داشبورد Streamlit قابل مشاهده و خروجی‌گرفتن
 (CSV/JSON/Markdown) هستند. هیچ عدد مالی توسط مدل زبانی ساخته نمی‌شود و نتایج توصیه‌ی سرمایه‌گذاری نیستند.
+
+**وضعیت فعلی:** هر هفت فاز پیاده‌سازی شده و ۶۶۰ تست پاس می‌شوند. کارهای باقی‌مانده: اجرای یک مدل واقعی روی
+مجموعه‌ای از بیانیه‌های FOMC که انسان برچسب زده (Task 3.5)، فعال‌کردن branch protection در گیت‌هاب (Task 6.4)
+و یک بار امتحان دریافت زنده‌ی داده از FRED.
